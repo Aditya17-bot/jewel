@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Design QA focused comparison</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #20231f; font-family: Arial, sans-serif; }
+      main { display: grid; grid-template-columns: 720px 720px; gap: 8px; padding: 8px; }
+      figure { position: relative; width: 720px; height: 940px; margin: 0; overflow: hidden; background: #fff; }
+      img { position: absolute; top: 0; right: 0; width: 1440px; height: 1024px; max-width: none; }
+      figcaption { position: absolute; z-index: 2; top: 10px; left: 10px; padding: 7px 10px; background: #152118; color: #fff; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <figure><figcaption>Source panel</figcaption><img src="/reference/selected-direction.png" alt="Source configuration panel" /></figure>
+      <figure><figcaption>Implementation panel</figcaption><img src="/qa/implementation-desktop-final.png" alt="Implementation configuration panel" /></figure>
+    </main>
+  </body>
+</html>

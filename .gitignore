@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+coverage/
+
+.DS_Store
+*.log
+
+.env
+.env.*
+!.env.example
+
+# In-progress local audit captures are not part of the product source.
+qa/audit-2026-08-21/
+.codex-audit/

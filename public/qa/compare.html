@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Design QA comparison</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #20231f; font-family: Arial, sans-serif; }
+      main { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 1440px; padding: 8px; }
+      figure { position: relative; width: 708px; height: 504px; margin: 0; overflow: hidden; background: #fff; }
+      img { width: 708px; height: 504px; object-fit: fill; }
+      figcaption { position: absolute; z-index: 2; top: 12px; left: 12px; padding: 7px 10px; background: #152118; color: #fff; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <figure><figcaption>Source</figcaption><img src="/reference/selected-direction.png" alt="Selected source design" /></figure>
+      <figure><figcaption>Implementation</figcaption><img src="/qa/implementation-desktop-final.png" alt="Browser-rendered implementation" /></figure>
+    </main>
+  </body>
+</html>
