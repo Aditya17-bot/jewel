@@ -14,6 +14,12 @@ export default defineConfig({
     warmup: {
       clientFiles: ["./src/main.tsx"],
     },
+    // MediaPipe's WASM runtime needs these to use SharedArrayBuffer. Without them it
+    // silently falls back to a much slower single-threaded path.
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+    },
   },
   plugins: [react()],
 });

@@ -7,6 +7,7 @@ import { LandingHero } from "./components/LandingHero";
 import { LeadDrawer } from "./components/LeadDrawer";
 import { ShareDrawer } from "./components/ShareDrawer";
 import { SupportingExperience } from "./components/SupportingExperience";
+import { TryOnStudio } from "./components/TryOnStudio";
 import { TrustStrip } from "./components/TrustStrip";
 import {
   defaultConfiguration,
@@ -19,7 +20,7 @@ import type { AppView, Configuration } from "./types";
 
 function getInitialView(): AppView {
   const requested = new URLSearchParams(window.location.search).get("view");
-  return requested === "twin" || requested === "collections" || requested === "value" || requested === "future"
+  return requested === "twin" || requested === "tryon" || requested === "collections" || requested === "value" || requested === "future"
     ? requested
     : "reveal";
 }
@@ -72,7 +73,7 @@ export function App() {
       return;
     }
 
-    const targetId = activeView === "twin" ? "digital-twin" : activeView;
+    const targetId = activeView === "twin" ? "digital-twin" : activeView === "tryon" ? "try-on" : activeView;
     window.requestAnimationFrame(() => {
       document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -112,6 +113,7 @@ export function App() {
               onCertificate={() => setCertificateOpen(true)}
             />
           </section>
+          <TryOnStudio />
           <TrustStrip />
           <SupportingExperience
             onViewProduct={() => navigate("twin")}

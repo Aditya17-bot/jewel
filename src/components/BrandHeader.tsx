@@ -15,6 +15,7 @@ interface BrandHeaderProps {
 
 const navItems: Array<{ label: string; view: AppView }> = [
   { label: "Digital Twin", view: "twin" },
+  { label: "Try It On", view: "tryon" },
   { label: "Collections", view: "collections" },
   { label: "Manufacturer Value", view: "value" },
   { label: "Future", view: "future" },
@@ -30,12 +31,12 @@ export function BrandHeader({ activeView, onNavigate, onPilot }: BrandHeaderProp
 
   return (
     <header className="brand-header">
-      <button className="brand-lockup" onClick={() => navigate("reveal")} aria-label="Aurelia Atelier home">
+      <button className="brand-lockup" onClick={() => navigate("reveal")} aria-label="Aurelia Antlers home">
         <span className="brand-mark" aria-hidden="true">
           <Diamond size={23} weight="light" />
         </span>
         <span className="brand-copy">
-          <strong>Aurelia Atelier</strong>
+          <strong>Aurelia Antlers</strong>
           <small>Precision. Protected.</small>
         </span>
       </button>

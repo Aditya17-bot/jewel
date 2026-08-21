@@ -1,4 +1,4 @@
-# Aurelia Atelier — Jewellery Digital Twin Demo
+# Aurelia Antlers — Jewellery Digital Twin Demo
 
 A responsive, interaction-rich sales prototype that demonstrates a protected jewellery digital twin journey:
 

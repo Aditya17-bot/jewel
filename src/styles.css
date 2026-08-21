@@ -777,3 +777,96 @@ img { display: block; max-width: 100%; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- Try it on ---------- */
+
+.try-on-stage { display: block; }
+.tryon-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.tryon-grid .size-option { height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 7px; }
+
+.tone-dot {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+.light-switcher {
+  position: absolute;
+  z-index: 6; /* above the canvas, which fills the stage and would swallow the clicks */
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px;
+  max-width: calc(100% - 28px);
+  background: rgba(255, 254, 250, 0.95);
+  border: 1px solid var(--line);
+}
+.light-switcher .size-option { padding: 0 13px; }
+
+.try-on-thumb {
+  margin-top: 10px;
+  width: 88px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+.try-on-upload {
+  margin-top: 10px;
+  width: 100%;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.try-on-error {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-left: 2px solid #a4462f;
+  background: #fbf3f1;
+  color: #7c3a28;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.configurator .size-spec { text-align: left; text-transform: none; letter-spacing: 0; font-size: 11px; line-height: 1.6; }
+
+.flat-stage { position: absolute; inset: 0; display: grid; place-items: center; padding: 26px 26px 78px; }
+/* Fill the stage rather than sitting at the photograph's own pixel size, which for a
+   phone-sized portrait is a postage stamp in the middle of a very large panel. */
+.flat-canvas { height: 100%; width: auto; max-width: 100%; }
+
+.stage-mode {
+  position: absolute;
+  z-index: 6;
+  top: 26px;
+  left: 26px;
+  display: flex;
+  gap: 6px;
+  padding: 7px;
+  background: rgba(255, 254, 250, 0.95);
+  border: 1px solid var(--line);
+}
+.stage-mode .size-option { padding: 0 13px; }
+
+.try-on-note {
+  margin: 12px 0 0;
+  padding: 11px 13px;
+  border-left: 2px solid var(--gold);
+  background: #f6f7f2;
+  color: #3d423d;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+/* Kept alive but out of sight, so its WebGL context is created once and never churned.
+   Not display:none - that resizes the drawing buffer to nothing and back on every toggle. */
+.stage-3d.is-stowed { opacity: 0; pointer-events: none; }
