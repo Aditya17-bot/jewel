@@ -38,3 +38,19 @@ Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts
 - The orbit is fenced to about +-15 degrees on purpose. One photograph holds nothing at all
   about the sides or the back of a head.
 - MediaPipe's WASM and weights are vendored under `public/mediapipe/`. No CDN.
+
+## When there is no WebGL
+
+- A browser that gives no WebGL context is a normal state, not an edge case: hardware
+  acceleration off, a blocklisted driver, a locked-down machine, or Chrome having disabled
+  the GPU after a crash. Nothing on the page may dead-end there.
+- `DigitalTwinViewer` falls back to the studio photograph of the current configuration
+  (`getConfigurationAsset`) rather than to an error panel. This does not weaken the
+  frozen-3D rule above - the geometry is untouched, it is simply unreachable on that
+  machine, and a still of the right ring beats a correct explanation of an empty box.
+- `TryOnStudio` defaults to its flat Canvas 2D renderer for the same reason, and only ever
+  builds a WebGL context when someone asks for 3D.
+- Never hold a probe's WebGL context: ask, read the answer, hand it straight back with
+  `WEBGL_lose_context`. A browser allows about a dozen live at once.
+- Never tear down and rebuild a WebGL context on a toggle. Build it once and hide it.
+  Repeated churn loses the GPU outright, and once it goes every later context fails too.

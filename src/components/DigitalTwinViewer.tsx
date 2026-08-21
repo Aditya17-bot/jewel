@@ -10,7 +10,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { Suspense, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
-import { getRingSizeSpec } from "../data/demoData";
+import { getConfigurationAsset, getRingSizeSpec } from "../data/demoData";
 import type { MetalId, RingSize, StoneId } from "../types";
 import { RingModel } from "./RingModel";
 
@@ -18,6 +18,7 @@ interface DigitalTwinViewerProps {
   metal: MetalId;
   stone: StoneId;
   size: RingSize;
+  engraving?: string;
 }
 
 type ViewerCommand = { action: "rotate" | "zoom" | "reset"; id: number } | null;
@@ -166,10 +167,19 @@ export function DigitalTwinViewer({ metal, stone, size }: DigitalTwinViewerProps
         aria-label={`Interactive 3D model of the R-1028 halo ring in ${metal} gold with ${stone} center stone, India size ${size}`}
       >
         {!webGlAvailable ? (
-          <div className="viewer-error">
-            <Cube size={30} />
-            <strong>3D preview unavailable</strong>
-            <span>This browser does not provide WebGL.</span>
+          // No WebGL here. Falling back to the studio photograph of this exact
+          // configuration rather than to an error: the ring is what the page is for, and a
+          // still of the right ring is worth far more than a correct explanation of why
+          // there is nothing to look at. The 3D geometry is untouched - it simply is not
+          // reachable on this machine.
+          <div className="viewer-still">
+            <img
+              src={getConfigurationAsset({ metal, stone, size, engraving: "" })}
+              alt={`R-1028 halo ring in ${metal} gold with a ${stone} centre stone, India size ${size}`}
+            />
+            <p className="viewer-still-note">
+              <Cube size={15} /> Still image — turning it needs WebGL, which this browser is not providing.
+            </p>
           </div>
         ) : (
           <>
