@@ -8,20 +8,32 @@
 
 import { useMemo, useState } from "react";
 import { LockSimple } from "@phosphor-icons/react";
+import { materialOptions, stoneOptions } from "../data/demoData";
 import { PIECES } from "../data/pieces";
+import type { MetalId, StoneId } from "../types";
 import { LiveTryOn } from "./LiveTryOn";
 import { TurntableViewer } from "./TurntableViewer";
 
 export function TwinTryOn() {
   const [selectedId, setSelectedId] = useState(PIECES[0].id);
+  const [metal, setMetal] = useState<MetalId>("white");
+  const [stone, setStone] = useState<StoneId>("natural");
+
   const piece = useMemo(
     () => PIECES.find((entry) => entry.id === selectedId) ?? PIECES[0],
     [selectedId],
   );
 
+  // A piece built from one photograph has one set of views and one metal. Offering
+  // swatches that cannot change anything would be a lie about what the twin holds.
+  const variable = piece.source === "rendered";
+  const frames = useMemo(() => piece.frames(metal, stone), [piece, metal, stone]);
+  const cutout = piece.cutout(metal, stone);
+
   // The camera hangs a piece on the ears or on a hand depending on what the piece is, so a
   // ring is never drawn on an earlobe.
   const earPiece = piece.wornOn === "ears" ? piece : undefined;
+  const wearable = piece.wornOn !== "neck";
   const ringPiece = piece.wornOn === "finger" ? piece : undefined;
 
   return (
@@ -32,12 +44,12 @@ export function TwinTryOn() {
             <span className="twin-half-label">The twin</span>
             <div className="twin-stage">
               <TurntableViewer
-                frames={piece.twin?.frames ?? []}
-                elevations={piece.twin?.elevations}
+                frames={frames}
+                elevations={piece.elevations}
                 label={`${piece.id}, ${piece.name}`}
                 fallback={
                   <div className="viewer-still">
-                    <img src={piece.cutout} alt={`${piece.id} ${piece.name}`} />
+                    <img src={cutout} alt={`${piece.id} ${piece.name}`} />
                     <p className="viewer-still-note">No twin generated for this piece yet.</p>
                   </div>
                 }
@@ -47,11 +59,11 @@ export function TwinTryOn() {
           <div className="twin-half">
             <span className="twin-half-label">On you</span>
             <LiveTryOn
-              key={piece.id}
-              pieceSrc={earPiece?.cutout ?? ""}
+              key={`${piece.id}-${metal}-${stone}`}
+              pieceSrc={earPiece ? cutout : ""}
               pieceLabel={earPiece ? `${piece.id} · both ears` : ""}
               pieceWidthMm={earPiece?.widthMm ?? 9}
-              ringSrc={ringPiece?.cutout}
+              ringSrc={ringPiece ? cutout : undefined}
               ringLabel={ringPiece ? `${piece.id} · ring finger` : undefined}
               ringWidthMm={ringPiece?.widthMm ?? 21}
             />
@@ -65,12 +77,9 @@ export function TwinTryOn() {
             <span className="product-id">{piece.id}</span>
             <h2>{piece.name}</h2>
             <p>
-              {piece.twin?.source === "rendered"
-                ? "Rendered twin"
-                : piece.twin
-                  ? "Generated from one photograph"
-                  : "No twin yet"}
-              &nbsp;&nbsp;·&nbsp;&nbsp;worn on the {piece.wornOn === "ears" ? "ears" : "hand"}
+              {piece.source === "rendered" ? "Rendered twin" : "Generated from one photograph"}
+              &nbsp;&nbsp;·&nbsp;&nbsp;worn on the{" "}
+              {piece.wornOn === "ears" ? "ears" : piece.wornOn === "neck" ? "neck" : "hand"}
             </p>
           </div>
           <div className="protected-product">
@@ -96,12 +105,44 @@ export function TwinTryOn() {
           <p className="size-spec">{piece.note}</p>
         </div>
 
+        {variable && (
+          <div className="config-section">
+            <span className="config-label"><b>2.</b> Metal and stone</span>
+            <div className="tryon-grid" role="group" aria-label="Metal">
+              {materialOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={option.id === metal ? "size-option is-selected" : "size-option"}
+                  onClick={() => setMetal(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="tryon-grid" role="group" aria-label="Stone">
+              {stoneOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={option.id === stone ? "size-option is-selected" : "size-option"}
+                  onClick={() => setStone(option.id)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="config-section">
-          <span className="config-label"><b>2.</b> Try it on</span>
+          <span className="config-label"><b>{variable ? 3 : 2}.</b> Try it on</span>
           <p className="size-spec">
             {piece.wornOn === "ears"
               ? "Start the camera and the studs land on both ears."
-              : "Start the camera and hold a hand up — the ring goes on your ring finger."}
+              : piece.wornOn === "neck"
+                ? "The camera places pieces on ears and hands. A pendant needs the collarbone, which is not tracked yet — turn the twin instead."
+                : "Start the camera and hold a hand up — the ring goes on your ring finger."}
             {" "}The camera opens only when you press the button and closes when you press stop.
             Frames go into the models and straight back onto the screen: none is sent anywhere,
             and none is kept.
@@ -109,7 +150,7 @@ export function TwinTryOn() {
         </div>
 
         <div className="config-section">
-          <span className="config-label"><b>3.</b> How it is sized</span>
+          <span className="config-label"><b>{variable ? 4 : 3}.</b> How it is sized</span>
           <p className="size-spec">
             {piece.wornOn === "ears"
               ? "The distance between your irises is the one real measurement a camera gives up, so a"

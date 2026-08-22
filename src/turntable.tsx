@@ -15,11 +15,15 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { StrictMode, Suspense, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as THREE from "three";
+import { EarringModel, NecklaceModel } from "./components/PieceModels";
 import { RingModel } from "./components/RingModel";
 import { getRingSizeSpec } from "./data/demoData";
 import type { MetalId, RingSize, StoneId } from "./types";
 
+type PieceKind = "ring" | "necklace" | "earring";
+
 interface Shot {
+  piece: PieceKind;
   metal: MetalId;
   stone: StoneId;
   size: RingSize;
@@ -28,6 +32,7 @@ interface Shot {
 }
 
 const DEFAULTS: Shot = {
+  piece: "ring",
   metal: "white",
   stone: "natural",
   size: 16,
@@ -43,6 +48,7 @@ function readHash(): Shot {
     return Number.isFinite(value) ? value : fallback;
   };
   return {
+    piece: (p.get("piece") as PieceKind) ?? DEFAULTS.piece,
     metal: (p.get("metal") as MetalId) ?? DEFAULTS.metal,
     stone: (p.get("stone") as StoneId) ?? DEFAULTS.stone,
     size: (num("size", DEFAULTS.size) as RingSize) ?? DEFAULTS.size,
@@ -95,11 +101,15 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
     const perspective = camera as THREE.PerspectiveCamera;
     const az = (shot.azimuth * Math.PI) / 180;
     const el = (shot.elevation * Math.PI) / 180;
-    // A constant distance, so the ring does not breathe as it turns.
-    // 0.92 of the exact bounding-sphere fit. The sphere is a conservative bound - the
-    // silhouette only approaches it near the face-on pose - so this fills the frame
-    // without ever clipping the shank at the widest angle.
-    const distance = (radius / Math.sin(((perspective.fov / 2) * Math.PI) / 180)) * 0.92;
+    // A constant distance, so the piece does not breathe as it turns.
+    //
+    // The factor is how much of the exact bounding-sphere fit to use. A sphere is a
+    // conservative bound for a compact piece like the ring, whose silhouette only
+    // approaches it face-on, so 0.92 fills the frame there without clipping the shank. A
+    // pair of earrings or a chain is wide and close to its own bound in every pose, and
+    // the same factor cuts the ends off - so those get room instead.
+    const fill = shot.piece === "ring" ? 0.92 : 1.12;
+    const distance = (radius / Math.sin(((perspective.fov / 2) * Math.PI) / 180)) * fill;
 
     perspective.position.set(
       center.x + Math.sin(az) * Math.cos(el) * distance,
@@ -148,7 +158,7 @@ function Stage() {
     return () => window.removeEventListener("hashchange", sync);
   }, []);
 
-  const token = `${shot.metal}|${shot.stone}|${shot.size}|${shot.azimuth}|${shot.elevation}`;
+  const token = `${shot.piece}|${shot.metal}|${shot.stone}|${shot.size}|${shot.azimuth}|${shot.elevation}`;
 
   return (
     <Canvas
@@ -168,7 +178,13 @@ function Stage() {
       <directionalLight position={[-4, 6, 8]} intensity={1.55} castShadow shadow-mapSize={[1024, 1024]} />
       <directionalLight position={[5, 2, 6]} intensity={0.7} />
       <Suspense fallback={null}>
-        <RingModel metal={shot.metal} stone={shot.stone} size={shot.size} />
+        {shot.piece === "necklace" ? (
+          <NecklaceModel metal={shot.metal} stone={shot.stone} />
+        ) : shot.piece === "earring" ? (
+          <EarringModel metal={shot.metal} stone={shot.stone} />
+        ) : (
+          <RingModel metal={shot.metal} stone={shot.stone} size={shot.size} />
+        )}
       </Suspense>
       <Rig shot={shot} token={token} />
       <Settle token={token} />

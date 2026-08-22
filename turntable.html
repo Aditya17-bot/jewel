@@ -13,9 +13,11 @@
         background: transparent;
         overflow: hidden;
       }
+      /* Fill the viewport the grabber sets, rather than pinning a size here - otherwise
+         asking for a larger render silently returns the same 1024 square. */
       #root {
-        width: 1024px;
-        height: 1024px;
+        width: 100vw;
+        height: 100vh;
       }
       canvas {
         display: block;

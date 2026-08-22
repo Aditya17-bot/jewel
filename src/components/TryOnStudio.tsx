@@ -393,7 +393,7 @@ export function TryOnStudio() {
   const activeModel = TRY_ON_MODELS.find((entry) => entry.id === wearer);
 
   return (
-    <section className="digital-twin-workspace" id="try-on" ref={sectionRef}>
+    <section className="digital-twin-workspace" id="try-on-photo" ref={sectionRef}>
       <div className="viewer-shell">
         <div className="product-stage three-stage try-on-stage" role="img" aria-label="Jewellery shown worn">
           {!vision && (
@@ -403,70 +403,10 @@ export function TryOnStudio() {
             </div>
           )}
           {vision && !face && !error && <div className="viewer-loading"><span /> Reading the photograph…</div>}
-          {face && mode === "flat" && (
+          {face && (
             <FlatStage face={face} piece={jewel} metal={metal} stone={stone} light={light} cutout={cutout} />
           )}
-          {mount3D && (
-          <Canvas
-            className={`twin-canvas stage-3d${face ? " is-ready" : ""}${mode === "3d" ? "" : " is-stowed"}`}
-            dpr={[1, 1.75]}
-            camera={{ fov: 25, near: 0.01, far: 100, position: [0, 0, 1] }}
-            gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-            // Only redraw when something actually changed. Two canvases both running a
-            // render loop for a static picture is what put this page over the edge on a
-            // laptop GPU in the first place.
-            frameloop="demand"
-            onCreated={({ gl }) => {
-              gl.toneMapping = THREE.ACESFilmicToneMapping;
-              gl.outputColorSpace = THREE.SRGBColorSpace;
-              // A lost context is not a crash to ride out - nothing will ever draw again
-              // on it. Fall back to the renderer that cannot lose one.
-              gl.domElement.addEventListener("webglcontextlost", (event) => {
-                event.preventDefault();
-                setLostContext(true);
-                setWebGL(false);
-                setMode("flat");
-              });
-            }}
-          >
-            <LightingRig light={light} />
-            {face && (
-              <>
-                <WornScene face={face} piece={piece} />
-                <SubjectRig face={face} resetKey={resetKey} />
-              </>
-            )}
-          </Canvas>
-          )}
-
           <div className="live-3d-badge"><span /> Worn live · your device only</div>
-
-          <div className="stage-mode" role="group" aria-label="How to draw it">
-            <button
-              className={mode === "flat" ? "size-option is-selected" : "size-option"}
-              onClick={() => setMode("flat")}
-            >
-              Flat
-            </button>
-            <button
-              className={mode === "3d" ? "size-option is-selected" : "size-option"}
-              onClick={() => {
-                // Re-probe rather than trusting the answer from start-up: the GPU may have
-                // come back since, and there is no event that says so.
-                const available = refreshVisionSupport();
-                setWebGL(available);
-                setVision(available);
-                if (available) {
-                  setLostContext(false);
-                  setMount3D(true);
-                  setMode("3d");
-                }
-              }}
-              title={webGL ? undefined : "Checks again - this browser gave no WebGL context last time"}
-            >
-              3D
-            </button>
-          </div>
 
           <div className="light-switcher" role="group" aria-label="Lighting">
             {Object.entries(ENVIRONMENTS).map(([id, preset]) => (

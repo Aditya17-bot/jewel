@@ -2,7 +2,6 @@ import {
   ArrowRight,
   Certificate,
   Check,
-  Info,
   LockSimple,
   ShieldCheck,
   WhatsappLogo,
@@ -10,18 +9,16 @@ import {
 import {
   flagshipProduct,
   formatWeight,
-  formatInr,
   getConfigurationAsset,
-  getRingDiameter,
   materialOptions,
-  ringSizes,
   stoneOptions,
 } from "../data/demoData";
 import type { Configuration, MetalId, StoneId } from "../types";
 
 interface ConfiguratorProps {
   configuration: Configuration;
-  estimatedPrice: number;
+  /** Still supplied by the page; the panel no longer shows a figure. */
+  estimatedPrice?: number;
   onChange: (configuration: Configuration) => void;
   onQuote: () => void;
   onShare: () => void;
@@ -30,7 +27,6 @@ interface ConfiguratorProps {
 
 export function Configurator({
   configuration,
-  estimatedPrice,
   onChange,
   onQuote,
   onShare,
@@ -38,7 +34,6 @@ export function Configurator({
 }: ConfiguratorProps) {
   const selectedMetal = materialOptions.find((option) => option.id === configuration.metal)!;
   const selectedStone = stoneOptions.find((option) => option.id === configuration.stone)!;
-  const selectedDiameter = getRingDiameter(configuration.size);
   const selectedWeight = formatWeight(configuration);
 
   const update = <Key extends keyof Configuration>(key: Key, value: Configuration[Key]) => {
@@ -99,39 +94,6 @@ export function Configurator({
         </div>
       </div>
 
-      <div className="config-section config-inline">
-        <span className="config-label"><b>3.</b> Ring size <small>(India)</small></span>
-        <div className="size-grid" role="group" aria-label="Ring size">
-          {ringSizes.map((size) => (
-            <button
-              key={size}
-              className={configuration.size === size ? "size-option is-selected" : "size-option"}
-              onClick={() => update("size", size)}
-              aria-pressed={configuration.size === size}
-              aria-label={`India size ${size}, ${getRingDiameter(size)} millimetre inner diameter`}
-              title={`India size ${size}, approximately ${getRingDiameter(size)} mm inner diameter`}
-            >
-              {size}
-            </button>
-          ))}
-        </div>
-        <p className="size-spec" aria-live="polite">India {configuration.size} · Inner Ø {selectedDiameter} mm</p>
-      </div>
-
-      <div className="config-section config-inline">
-        <label className="config-label" htmlFor="engraving"><b>4.</b> Engraving <small>(inside band)</small></label>
-        <div className="engraving-field">
-          <input
-            id="engraving"
-            value={configuration.engraving}
-            maxLength={25}
-            onChange={(event) => update("engraving", event.target.value)}
-            placeholder="Enter text"
-          />
-          <span>{configuration.engraving.length} / 25</span>
-        </div>
-      </div>
-
       <div className="configuration-summary">
         <div className="summary-visual">
           <img
@@ -144,8 +106,6 @@ export function Configurator({
           <dl>
             <div><dt>Metal</dt><dd>18K {selectedMetal.label}</dd></div>
             <div><dt>Stone</dt><dd>{selectedStone.label} ({selectedStone.grade})</dd></div>
-            <div><dt>Ring size</dt><dd>{configuration.size} · Ø {selectedDiameter} mm</dd></div>
-            <div><dt>Engraving</dt><dd>{configuration.engraving || "None"}</dd></div>
             <div><dt>Approx. weight</dt><dd>{selectedWeight}</dd></div>
           </dl>
         </div>
@@ -155,11 +115,6 @@ export function Configurator({
       </div>
 
       <div className="price-actions">
-        <div className="price-block">
-          <span>Estimated price <Info size={14} /></span>
-          <strong aria-live="polite">{formatInr(estimatedPrice)}</strong>
-          <small>Indicative demo pricing. Merchant logic applies.</small>
-        </div>
         <div className="action-stack">
           <button className="button button-dark" onClick={onQuote}>
             Request Quote <ArrowRight size={18} />

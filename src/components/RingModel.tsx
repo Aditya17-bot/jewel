@@ -18,22 +18,22 @@ interface RingModelProps {
 
 type Point3 = [number, number, number];
 
-const metalPalette: Record<MetalId, { color: string; roughness: number }> = {
+export const metalPalette: Record<MetalId, { color: string; roughness: number }> = {
   white: { color: "#f7f8f8", roughness: 0.17 },
   yellow: { color: "#d7aa35", roughness: 0.16 },
   rose: { color: "#cf8b7d", roughness: 0.16 },
 };
 
-const stonePalette: Record<StoneId, { color: string; attenuation: string; ior: number }> = {
+export const stonePalette: Record<StoneId, { color: string; attenuation: string; ior: number }> = {
   natural: { color: "#ffffff", attenuation: "#dce9ff", ior: 2.417 },
   lab: { color: "#f4fdff", attenuation: "#cbefff", ior: 2.417 },
   ruby: { color: "#c91443", attenuation: "#9a0c31", ior: 1.76 },
   emerald: { color: "#07845a", attenuation: "#075e41", ior: 1.58 },
 };
 
-const diamondLift = new THREE.Color().setRGB(1.02, 1.04, 1.08);
+export const diamondLift = new THREE.Color().setRGB(1.02, 1.04, 1.08);
 
-function createBrightGemEnvironment(highContrast = true) {
+export function createBrightGemEnvironment(highContrast = true) {
   const panels = [
     { axis: "x", dark: 0.18, cool: "#dbe8f1", warm: "#f2e4cf" },
     { axis: "y", dark: 0.72, cool: "#e8eef5", warm: "#ead7bd" },
@@ -109,7 +109,7 @@ function connectMatchingRings(target: number[], upper: Point3[], lower: Point3[]
   }
 }
 
-function createRoundBrilliantGeometry(radius = 0.66, facetColor = false, toneScale = 1) {
+export function createRoundBrilliantGeometry(radius = 0.66, facetColor = false, toneScale = 1) {
   const vertices: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
@@ -225,7 +225,7 @@ function octagonalRectangle(width: number, height: number, cut: number, z: numbe
   ];
 }
 
-function createEmeraldCutGeometry() {
+export function createEmeraldCutGeometry() {
   const vertices: number[] = [];
   const table = octagonalRectangle(0.62, 0.82, 0.11, 0.34);
   const crown = octagonalRectangle(0.84, 1.08, 0.14, 0.18);
