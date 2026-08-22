@@ -871,7 +871,58 @@ img { display: block; max-width: 100%; }
    Not display:none - that resizes the drawing buffer to nothing and back on every toggle. */
 .stage-3d.is-stowed { opacity: 0; pointer-events: none; }
 
-/* No WebGL: the product still, rather than an apology where the product should be. */
+/* No WebGL: frames baked from the same RingModel, so the ring still turns. Every frame
+   sits stacked and only one is opaque - swapping a src instead would force a fresh decode
+   on each step and the turn stutters exactly when it needs to feel solid. */
+.turntable {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.turntable:active { cursor: grabbing; }
+.turntable:focus-visible { outline: 2px solid var(--ink, #1c1b19); outline-offset: -3px; }
+.turntable img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  pointer-events: none;
+}
+.turntable img.is-shown { opacity: 1; }
+.turntable-angle,
+.turntable-loading {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  background: rgba(255, 254, 250, 0.95);
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.turntable-angle { opacity: 0; transition: opacity 160ms ease; }
+.turntable.is-ready .turntable-angle { opacity: 1; }
+.turntable-angle b { font-variant-numeric: tabular-nums; color: var(--ink, #1c1b19); }
+@media (prefers-reduced-motion: reduce) {
+  .turntable-angle { transition: none; }
+}
+
+/* Last resort: a configuration nobody has baked frames for yet. */
 .viewer-still { display: grid; place-items: center; gap: 14px; width: 100%; height: 100%; padding: 40px 30px 70px; }
 .viewer-still img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .viewer-still-note {

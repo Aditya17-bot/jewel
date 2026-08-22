@@ -13,6 +13,7 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { getConfigurationAsset, getRingSizeSpec } from "../data/demoData";
 import type { MetalId, RingSize, StoneId } from "../types";
 import { RingModel } from "./RingModel";
+import { TurntableViewer, type TurntableManifest } from "./TurntableViewer";
 
 interface DigitalTwinViewerProps {
   metal: MetalId;
@@ -93,6 +94,26 @@ function SceneControls({
   );
 }
 
+/**
+ * Last resort: the studio photograph of this configuration. Reached only when a
+ * configuration was never baked, which for now means never - but a new metal or stone
+ * added to the configurator before its frames are rendered should degrade to the right
+ * photograph rather than to an empty box.
+ */
+function StillImage({ metal, stone, size }: { metal: MetalId; stone: StoneId; size: RingSize }) {
+  return (
+    <div className="viewer-still">
+      <img
+        src={getConfigurationAsset({ metal, stone, size, engraving: "" })}
+        alt={`R-1028 halo ring in ${metal} gold with a ${stone} centre stone, India size ${size}`}
+      />
+      <p className="viewer-still-note">
+        <Cube size={15} /> Still image — this combination has not been rendered yet.
+      </p>
+    </div>
+  );
+}
+
 export function DigitalTwinViewer({ metal, stone, size }: DigitalTwinViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
@@ -108,6 +129,19 @@ export function DigitalTwinViewer({ metal, stone, size }: DigitalTwinViewerProps
     }
   });
   const sizeSpec = getRingSizeSpec(size);
+
+  // Only fetched when there is no WebGL, so a visitor whose browser renders the live twin
+  // never pays for it. Failure is not an error state: the still image is a fine answer.
+  const [manifest, setManifest] = useState<TurntableManifest | null>(null);
+  useEffect(() => {
+    if (webGlAvailable) return undefined;
+    const abort = new AbortController();
+    fetch("/turntable/manifest.json", { signal: abort.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: TurntableManifest | null) => setManifest(data))
+      .catch(() => setManifest(null));
+    return () => abort.abort();
+  }, [webGlAvailable]);
 
   useEffect(() => {
     const syncFullscreen = () => {
@@ -167,20 +201,23 @@ export function DigitalTwinViewer({ metal, stone, size }: DigitalTwinViewerProps
         aria-label={`Interactive 3D model of the R-1028 halo ring in ${metal} gold with ${stone} center stone, India size ${size}`}
       >
         {!webGlAvailable ? (
-          // No WebGL here. Falling back to the studio photograph of this exact
-          // configuration rather than to an error: the ring is what the page is for, and a
-          // still of the right ring is worth far more than a correct explanation of why
-          // there is nothing to look at. The 3D geometry is untouched - it simply is not
-          // reachable on this machine.
-          <div className="viewer-still">
-            <img
-              src={getConfigurationAsset({ metal, stone, size, engraving: "" })}
-              alt={`R-1028 halo ring in ${metal} gold with a ${stone} centre stone, India size ${size}`}
-            />
-            <p className="viewer-still-note">
-              <Cube size={15} /> Still image — turning it needs WebGL, which this browser is not providing.
-            </p>
-          </div>
+          // No WebGL here, which is not an edge case - hardware acceleration switched off,
+          // a locked down work laptop, a GPU process the browser has given up on. Rather
+          // than explain why there is nothing to look at, serve frames rendered from the
+          // same RingModel by tools/turntable: the visitor can still turn the ring and
+          // still see the side and the gallery, which is what they came for.
+          <>
+            {manifest ? (
+              <TurntableViewer
+                manifest={manifest}
+                metal={metal}
+                stone={stone}
+                fallback={<StillImage metal={metal} stone={stone} size={size} />}
+              />
+            ) : (
+              <StillImage metal={metal} stone={stone} size={size} />
+            )}
+          </>
         ) : (
           <>
             {!ready && <div className="viewer-loading"><span /> Building protected 3D twin…</div>}
