@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>R-1028 turntable render</title>
+    <style>
+      /* A capture surface, not a page. Square, transparent, no chrome, no scrollbars -
+         whatever the frame grabber sees is exactly what ships. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+      #root {
+        width: 1024px;
+        height: 1024px;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body data-ready="0">
+    <div id="root"></div>
+    <script type="module" src="/src/turntable.tsx"></script>
+  </body>
+</html>

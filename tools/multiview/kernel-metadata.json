@@ -1,0 +1,15 @@
+{
+  "id": "adityasridhar077/aurelia-multiview",
+  "title": "aurelia-multiview",
+  "code_file": "mv.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": ["adityasridhar077/aurelia-tryon-inputs"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

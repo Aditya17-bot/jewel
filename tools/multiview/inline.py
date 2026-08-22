@@ -1,0 +1,15 @@
+# Splice the base64 conditioning image into the kernel script. Kept as a build step so the
+# authored source (mv_head.py) stays readable and the 180 KB blob never lands in a diff.
+import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ANCHOR = "import os, sys, json, base64, io, traceback, subprocess"
+
+b64 = open(os.path.join(HERE, "cond.b64")).read().strip()
+head = open(os.path.join(HERE, "mv", "mv_head.py"), encoding="utf-8").read()
+assert ANCHOR in head, "anchor line moved"
+
+out = head.replace(ANCHOR, ANCHOR + '\n\nCOND_B64 = "' + b64 + '"', 1)
+path = os.path.join(HERE, "mv", "mv.py")
+open(path, "w", encoding="utf-8").write(out)
+print(f"wrote {path}  {len(out)/1024:.0f} KB")
