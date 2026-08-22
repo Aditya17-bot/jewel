@@ -99,3 +99,15 @@ export const PIECES: Piece[] = [
 export function findPiece(id: string): Piece | undefined {
   return PIECES.find((piece) => piece.id === id);
 }
+
+/**
+ * Frames for the landing hero, rendered at 1024px rather than the 512px the product stage
+ * uses. The hero draws up to 660 CSS px and twice that on a dense display, where the
+ * smaller set is visibly soft. Transparency makes this nearly free: 35 KB a frame.
+ */
+export const HERO_FRAMES: string[][] = [
+  Array.from(
+    { length: 24 },
+    (_, index) => `/hero/r1028/frame_0_${String(index).padStart(2, "0")}.webp`,
+  ),
+];

@@ -243,11 +243,37 @@ export function TryOnStudio() {
   // Photos can be swapped faster than FaceMesh can finish. Only the newest result counts.
   const analysisRef = useRef(0);
 
+  // ~15 MB of local WASM and weights, fetched when this section comes within reach of the
+  // viewport rather than on page load. Every visitor was paying for it, including the ones
+  // who never scroll this far, and it competes with everything above it for bandwidth and
+  // for the main thread while the page is still settling.
+  const sectionRef = useRef<HTMLElement>(null);
+  const [inReach, setInReach] = useState(false);
+
   useEffect(() => {
-    // ~15 MB of local WASM and weights. Starting now means the first photo only waits for
-    // the detection, not for the download.
-    preloadFaceMesh();
+    const node = sectionRef.current;
+    if (!node) return undefined;
+    if (typeof IntersectionObserver === "undefined") {
+      setInReach(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setInReach(true);
+          observer.disconnect();
+        }
+      },
+      // A screen of margin, so the download starts before the section is actually read.
+      { rootMargin: "800px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (inReach) preloadFaceMesh();
+  }, [inReach]);
 
   const track = useCallback(async (file: File, label: string) => {
     const token = (analysisRef.current += 1);
@@ -281,8 +307,9 @@ export function TryOnStudio() {
 
   // Whichever model is chosen goes through the same tracker your own photo does.
   useEffect(() => {
+    if (!inReach) return undefined;
     const model = TRY_ON_MODELS.find((entry) => entry.id === wearer);
-    if (!model?.photo) return;
+    if (!model?.photo) return undefined;
     let cancelled = false;
     loadModelPhoto(model.id)
       .then((file) => {
@@ -292,7 +319,7 @@ export function TryOnStudio() {
     return () => {
       cancelled = true;
     };
-  }, [wearer, track]);
+  }, [inReach, wearer, track]);
 
   const piece = useMemo(() => {
     void catalogue;
@@ -373,7 +400,7 @@ export function TryOnStudio() {
   const activeModel = TRY_ON_MODELS.find((entry) => entry.id === wearer);
 
   return (
-    <section className="digital-twin-workspace" id="try-on">
+    <section className="digital-twin-workspace" id="try-on" ref={sectionRef}>
       <div className="viewer-shell">
         <div className="product-stage three-stage try-on-stage" role="img" aria-label="Jewellery shown worn">
           {!face && <div className="viewer-loading"><span /> Reading the photograph…</div>}

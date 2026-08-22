@@ -1,6 +1,5 @@
 import { ArrowDown, ArrowRight, LockSimple, SlidersHorizontal } from "@phosphor-icons/react";
-import { useMemo } from "react";
-import { findPiece } from "../data/pieces";
+import { HERO_FRAMES } from "../data/pieces";
 import { TurntableViewer } from "./TurntableViewer";
 
 interface LandingHeroProps {
@@ -13,11 +12,6 @@ interface LandingHeroProps {
 const HERO_SPIN_DEGREES_PER_FRAME = 0.28;
 
 export function LandingHero({ onExplore, onWorkflow }: LandingHeroProps) {
-  // Memoised, so the viewer is not handed a fresh array on every render.
-  const heroFrames = useMemo(() => {
-    const flagship = findPiece("R-1028");
-    return flagship?.twin ? [flagship.twin.frames[0]] : [];
-  }, []);
 
   return (
     <main className="landing" id="top">
@@ -50,7 +44,7 @@ export function LandingHero({ onExplore, onWorkflow }: LandingHeroProps) {
           </div>
           <div className="landing-turntable">
             <TurntableViewer
-              frames={heroFrames}
+              frames={HERO_FRAMES}
               label="The R-1028 diamond halo ring, turning"
               autoSpin={HERO_SPIN_DEGREES_PER_FRAME}
               bare
