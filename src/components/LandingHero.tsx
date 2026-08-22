@@ -1,11 +1,20 @@
 import { ArrowDown, ArrowRight, LockSimple, SlidersHorizontal } from "@phosphor-icons/react";
+import { findPiece } from "../data/pieces";
+import { TurntableViewer } from "./TurntableViewer";
 
 interface LandingHeroProps {
   onExplore: () => void;
   onWorkflow: () => void;
 }
 
+// The hero turns on its own until someone takes hold of it. Only the level tier is loaded
+// - about 700 KB - because the landing page should not fetch a tilt nobody asked for.
+const HERO_SPIN_DEGREES_PER_FRAME = 0.28;
+
 export function LandingHero({ onExplore, onWorkflow }: LandingHeroProps) {
+  const flagship = findPiece("R-1028");
+  const heroFrames = flagship?.twin ? [flagship.twin.frames[0]] : [];
+
   return (
     <main className="landing" id="top">
       <section className="landing-hero">
@@ -35,7 +44,17 @@ export function LandingHero({ onExplore, onWorkflow }: LandingHeroProps) {
             <span>Flagship digital twin</span>
             <span>R-1028 · Live demo</span>
           </div>
-          <img src="/assets/hero-ring-white.png" alt="Front view of the R-1028 diamond halo ring" />
+          <div className="landing-turntable">
+            <TurntableViewer
+              frames={heroFrames}
+              label="The R-1028 diamond halo ring, turning"
+              autoSpin={HERO_SPIN_DEGREES_PER_FRAME}
+              bare
+              fallback={
+                <img src="/assets/hero-ring-white.png" alt="Front view of the R-1028 diamond halo ring" />
+              }
+            />
+          </div>
           <button className="landing-orbit" onClick={onExplore}>
             <span>360°</span>
             Inspect design

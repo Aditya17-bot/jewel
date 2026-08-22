@@ -3,9 +3,13 @@
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# cond.b64 comes from prep.py, which writes it into the working directory. Reading it from
+# there rather than from next to this script keeps the two halves of the build agreeing
+# about which piece is being generated.
+COND = os.environ.get("PREP_OUT") or os.getcwd()
 ANCHOR = "import os, sys, json, base64, io, traceback, subprocess"
 
-b64 = open(os.path.join(HERE, "cond.b64")).read().strip()
+b64 = open(os.path.join(COND, "cond.b64")).read().strip()
 head = open(os.path.join(HERE, "mv", "mv_head.py"), encoding="utf-8").read()
 assert ANCHOR in head, "anchor line moved"
 

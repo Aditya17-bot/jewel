@@ -6,7 +6,10 @@ import numpy as np
 from PIL import Image
 
 SRC = r"C:\adi\aurelia-ref\public\assets"
-OUT = os.path.dirname(os.path.abspath(__file__))
+# The working directory, not the script's own directory. Writing next to the script means
+# running it by absolute path silently drops cond.b64 somewhere inline.py is not looking,
+# and the next kernel run quietly regenerates the previous piece.
+OUT = os.environ.get("PREP_OUT") or os.getcwd()
 
 
 def largest_blob(mask):

@@ -209,6 +209,21 @@ img { display: block; max-width: 100%; }
   background: #f4f4f0;
 }
 .landing-product img { width: min(92%, 940px); user-select: none; mix-blend-mode: multiply; }
+/* The hero ring turns. Sized as a square so the frames, which are square renders, fill it
+   without the ring drifting as it rotates. */
+.landing-turntable {
+  position: relative;
+  width: min(92%, 660px);
+  aspect-ratio: 1;
+}
+/* Frames are rendered on transparency; multiply lets them sit on the paper ground the way
+   the still they replaced did. */
+.landing-turntable .turntable img { mix-blend-mode: multiply; width: 100%; }
+.landing-turntable .turntable { cursor: grab; }
+.landing-turntable .turntable:active { cursor: grabbing; }
+@media (max-width: 900px) {
+  .landing-turntable { width: 108%; }
+}
 .landing-visual-meta {
   position: absolute;
   z-index: 2;

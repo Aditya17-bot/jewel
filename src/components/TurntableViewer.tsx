@@ -20,6 +20,10 @@ interface TurntableViewerProps {
   label: string;
   /** Rendered when there are no frames at all. */
   fallback?: React.ReactNode;
+  /** Degrees per frame of idle rotation. Stops for good the first time someone drags. */
+  autoSpin?: number;
+  /** Hides the angle readout, for decorative use. */
+  bare?: boolean;
 }
 
 /** Roughly a full turn per wrist movement, which is what a product spinner trains people to expect. */
@@ -28,7 +32,14 @@ const PIXELS_PER_TURN = 420;
  *  vertical wobble inside an ordinary horizontal drag. */
 const TILT_THRESHOLD = 90;
 
-export function TurntableViewer({ frames, elevations, label, fallback }: TurntableViewerProps) {
+export function TurntableViewer({
+  frames,
+  elevations,
+  label,
+  fallback,
+  autoSpin = 0,
+  bare = false,
+}: TurntableViewerProps) {
   const azimuths = frames[0]?.length ?? 0;
   const tiers = frames.length;
   const step = azimuths ? 360 / azimuths : 0;
@@ -43,6 +54,9 @@ export function TurntableViewer({ frames, elevations, label, fallback }: Turntab
   const [frame, setFrame] = useState(0);
   const [azimuthLabel, setAzimuthLabel] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  // Idle rotation is an invitation, not an animation to sit through: once someone takes
+  // hold of it, it is theirs and it never starts turning on its own again.
+  const touchedRef = useRef(false);
 
   // Every frame is in the DOM, so the browser is already fetching all of them - this only
   // decides when the stage stops saying "loading". Gate that on the first tier alone: a
@@ -80,23 +94,30 @@ export function TurntableViewer({ frames, elevations, label, fallback }: Turntab
 
   useEffect(() => {
     if (!azimuths) return undefined;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let raf = 0;
     const spin = () => {
-      if (!draggingRef.current && Math.abs(velocityRef.current) > 0.06) {
+      if (draggingRef.current) {
+        // nothing to do: pointermove is already driving it
+      } else if (Math.abs(velocityRef.current) > 0.06) {
         velocityRef.current *= 0.93;
         azimuthRef.current += velocityRef.current;
+        apply();
+      } else if (autoSpin && !touchedRef.current && !reduced && loaded) {
+        azimuthRef.current += autoSpin;
         apply();
       }
       raf = window.requestAnimationFrame(spin);
     };
     raf = window.requestAnimationFrame(spin);
     return () => window.cancelAnimationFrame(raf);
-  }, [apply, azimuths]);
+  }, [apply, autoSpin, azimuths, loaded]);
 
   if (!azimuths) return <>{fallback ?? null}</>;
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     draggingRef.current = true;
+    touchedRef.current = true;
     tiltCarryRef.current = 0;
     lastRef.current = { x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -136,6 +157,7 @@ export function TurntableViewer({ frames, elevations, label, fallback }: Turntab
     else if (event.key === "ArrowUp") setTier((current) => Math.min(tiers - 1, current + 1));
     else if (event.key === "ArrowDown") setTier((current) => Math.max(0, current - 1));
     else return;
+    touchedRef.current = true;
     velocityRef.current = 0;
     apply();
     event.preventDefault();
@@ -168,11 +190,11 @@ export function TurntableViewer({ frames, elevations, label, fallback }: Turntab
         )),
       )}
       {!loaded && <p className="turntable-loading"><span /> Loading views…</p>}
-      <p className="turntable-angle">
+      {bare ? null : <p className="turntable-angle">
         <b>{String(azimuthLabel).padStart(3, "0")}°</b>
         {elevationLabel !== undefined && tiers > 1 ? <> · {elevationLabel >= 0 ? "+" : "−"}{Math.abs(elevationLabel)}°</> : null}
         {" · drag to turn"}
-      </p>
+      </p>}
     </div>
   );
 }
