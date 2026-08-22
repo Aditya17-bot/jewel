@@ -19,6 +19,7 @@ import {
   type CameraHandle,
 } from "../tryon/camera";
 import { readFace } from "../tryon/compose";
+import { NO_VISION_MESSAGE } from "../tryon/delegate";
 
 export type WornAs = "ears" | "finger";
 
@@ -124,9 +125,13 @@ export function LiveTryOn({
       if (wantsFace) landmarker = await getVideoLandmarker();
       // Another 7.5 MB, so it is only fetched when there is a ring to put on a finger.
       if (wantsHands) hands = await getHandLandmarker();
-    } catch {
+    } catch (caught) {
       setStatus("error");
-      setError(MESSAGES["model-failed"]);
+      setError(
+        (caught as Error)?.message === "no-webgl"
+          ? NO_VISION_MESSAGE
+          : MESSAGES["model-failed"],
+      );
       return;
     }
 

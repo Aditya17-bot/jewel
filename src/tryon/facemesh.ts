@@ -9,6 +9,7 @@
 // coordinates: +X right, +Y up, +Z toward the viewer.
 
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { canRunVisionTasks, NO_VISION_MESSAGE, pickDelegate } from './delegate';
 import { Vector3 } from 'three';
 
 const WASM_DIR = '/mediapipe/wasm';
@@ -57,10 +58,13 @@ let landmarkerPromise = null;
 
 /** Loads the model once and reuses it. ~15 MB of WASM and weights, all served locally. */
 function getLandmarker() {
+  // Checked before the 15 MB download rather than after it: without WebGL the model
+  // cannot run, and finding that out at detect() costs the user the whole wait first.
+  if (!canRunVisionTasks()) return Promise.reject(new Error('no-webgl'));
   landmarkerPromise ??= (async () => {
     const fileset = await FilesetResolver.forVisionTasks(WASM_DIR);
     return FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODEL_PATH },
+      baseOptions: { modelAssetPath: MODEL_PATH, delegate: pickDelegate() },
       runningMode: 'IMAGE',
       numFaces: 1,
     });

@@ -11,6 +11,7 @@
 
 import { FaceLandmarker, FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 import type { FaceReadout } from './compose';
+import { canRunVisionTasks, pickDelegate } from './delegate';
 
 const WASM_DIR = '/mediapipe/wasm';
 const MODEL_PATH = '/mediapipe/models/face_landmarker.task';
@@ -21,10 +22,11 @@ let handLandmarker: Promise<HandLandmarker> | null = null;
 
 /** Loads the VIDEO-mode landmarker once and reuses it. */
 export function getVideoLandmarker(): Promise<FaceLandmarker> {
+  if (!canRunVisionTasks()) return Promise.reject(new Error('no-webgl'));
   videoLandmarker ??= (async () => {
     const fileset = await FilesetResolver.forVisionTasks(WASM_DIR);
     return FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODEL_PATH },
+      baseOptions: { modelAssetPath: MODEL_PATH, delegate: pickDelegate() },
       runningMode: 'VIDEO',
       numFaces: 1,
     });
@@ -34,10 +36,11 @@ export function getVideoLandmarker(): Promise<FaceLandmarker> {
 
 /** Loads the hand model once. Another 7.5 MB, so it is only fetched when a ring is chosen. */
 export function getHandLandmarker(): Promise<HandLandmarker> {
+  if (!canRunVisionTasks()) return Promise.reject(new Error('no-webgl'));
   handLandmarker ??= (async () => {
     const fileset = await FilesetResolver.forVisionTasks(WASM_DIR);
     return HandLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: HAND_MODEL_PATH },
+      baseOptions: { modelAssetPath: HAND_MODEL_PATH, delegate: pickDelegate() },
       runningMode: 'VIDEO',
       numHands: 2,
     });

@@ -8,15 +8,12 @@
   "size": 16,
   "configurations": [
     "white-natural",
-    "white-lab",
     "white-ruby",
     "white-emerald",
     "yellow-natural",
-    "yellow-lab",
     "yellow-ruby",
     "yellow-emerald",
     "rose-natural",
-    "rose-lab",
     "rose-ruby",
     "rose-emerald"
   ]

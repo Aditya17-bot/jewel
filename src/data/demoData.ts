@@ -57,14 +57,6 @@ export const stoneOptions: StoneOption[] = [
     swatchAsset: "/assets/stone-diamond.png",
   },
   {
-    id: "lab",
-    label: "Lab-Grown Diamond",
-    grade: "E–VS1",
-    priceDelta: -32_000,
-    tone: "#edf2f1",
-    swatchAsset: "/assets/stone-diamond.png",
-  },
-  {
     id: "ruby",
     label: "Ruby",
     grade: "AAA",

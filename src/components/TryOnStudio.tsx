@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { analysePhoto, preloadFaceMesh } from "../tryon/facemesh";
+import { NO_VISION_MESSAGE, canRunVisionTasks, refreshVisionSupport } from "../tryon/delegate";
 import { buildFace } from "../tryon/face";
 import { ENVIRONMENTS, paintEnvironment } from "../tryon/environments";
 import { JEWELS, METALS, STONES, createMeasuredPiece } from "../tryon/jewels";
@@ -150,31 +151,6 @@ function WornScene({ face, piece }: { face: Face; piece: THREE.Group | null }) {
   );
 }
 
-/**
- * Does this browser actually give a WebGL context?
- *
- * Hardware acceleration switched off, a blocklisted GPU or a locked-down machine all
- * produce a browser that runs the page perfectly and then cannot render a single triangle.
- *
- * Two things matter here and both were got wrong first time round. The probe has to hand
- * its context straight back - a browser allows only a dozen or so live at once, and a probe
- * that keeps one is a leak that eventually costs a real canvas its context. And the answer
- * must not be cached forever: once the GPU process has fallen over, every later context
- * fails too, so a latched "yes" from start-up is a lie by the time it matters.
- */
-function probeWebGL(): boolean {
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
-    if (!gl) return false;
-    // Give it back at once, rather than holding one of the browser's few slots.
-    (gl.getExtension("WEBGL_lose_context") as { loseContext(): void } | null)?.loseContext();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** The same try-on, drawn on the 2D context. No GPU involved at any point. */
 function FlatStage({
   face,
@@ -225,8 +201,18 @@ export function TryOnStudio() {
   const [resetKey, setResetKey] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [cutout, setCutout] = useState<HTMLCanvasElement | null>(null);
-  const [webGL, setWebGL] = useState(probeWebGL);
+  const [webGL, setWebGL] = useState(canRunVisionTasks);
   const [lostContext, setLostContext] = useState(false);
+  // Whether the face model can run at all, which on this page is the same question as
+  // whether there is a WebGL context: MediaPipe needs one whatever `delegate` says.
+  //
+  // Read synchronously here rather than waiting for analysePhoto to reject, because that
+  // road is long and every step of it can swallow the answer - the preload catches and
+  // discards, the analysis only starts once an observer has fired and a photograph has
+  // been fetched, and StrictMode's double-invoke means a stale token can drop the one
+  // rejection that would have set the message. All of which ends as a spinner that never
+  // stops. Asking the question up front cannot fail that way.
+  const [vision, setVision] = useState(canRunVisionTasks);
   // Flat at rest, always. The Digital Twin viewer already holds a WebGL context for the
   // life of the page; opening a second one here by default was enough to take the GPU down
   // on a laptop, and then neither section had anything to draw. 3D is one click away and
@@ -272,8 +258,8 @@ export function TryOnStudio() {
   }, []);
 
   useEffect(() => {
-    if (inReach) preloadFaceMesh();
-  }, [inReach]);
+    if (inReach && vision) preloadFaceMesh();
+  }, [inReach, vision]);
 
   const track = useCallback(async (file: File, label: string) => {
     const token = (analysisRef.current += 1);
@@ -297,17 +283,20 @@ export function TryOnStudio() {
     } catch (cause) {
       if (token !== analysisRef.current) return;
       setStatus("");
+      const reason = (cause as Error)?.message;
       setError(
-        (cause as Error)?.message === "no-face"
+        reason === "no-face"
           ? "No face found in that photograph. A clear, well-lit shot with the head close to upright works best."
-          : `Face tracking could not start: ${(cause as Error)?.message ?? cause}`,
+          : reason === "no-webgl"
+            ? NO_VISION_MESSAGE
+            : `Face tracking could not start: ${reason ?? cause}`,
       );
     }
   }, []);
 
   // Whichever model is chosen goes through the same tracker your own photo does.
   useEffect(() => {
-    if (!inReach) return undefined;
+    if (!inReach || !vision) return undefined;
     const model = TRY_ON_MODELS.find((entry) => entry.id === wearer);
     if (!model?.photo) return undefined;
     let cancelled = false;
@@ -319,7 +308,7 @@ export function TryOnStudio() {
     return () => {
       cancelled = true;
     };
-  }, [inReach, wearer, track]);
+  }, [inReach, vision, wearer, track]);
 
   const piece = useMemo(() => {
     void catalogue;
@@ -329,6 +318,10 @@ export function TryOnStudio() {
 
   const selectPhoto = (file: File | undefined) => {
     if (!file) return;
+    if (!vision) {
+      setError(NO_VISION_MESSAGE);
+      return;
+    }
     if (!ACCEPTED.includes(file.type)) {
       setError(`That file is a ${file.type || "unknown type"}. Use a JPEG, PNG or WebP image.`);
       return;
@@ -403,7 +396,13 @@ export function TryOnStudio() {
     <section className="digital-twin-workspace" id="try-on" ref={sectionRef}>
       <div className="viewer-shell">
         <div className="product-stage three-stage try-on-stage" role="img" aria-label="Jewellery shown worn">
-          {!face && <div className="viewer-loading"><span /> Reading the photograph…</div>}
+          {!vision && (
+            <div className="viewer-error">
+              <strong>This browser gives no WebGL context</strong>
+              <span>{NO_VISION_MESSAGE}</span>
+            </div>
+          )}
+          {vision && !face && !error && <div className="viewer-loading"><span /> Reading the photograph…</div>}
           {face && mode === "flat" && (
             <FlatStage face={face} piece={jewel} metal={metal} stone={stone} light={light} cutout={cutout} />
           )}
@@ -454,8 +453,9 @@ export function TryOnStudio() {
               onClick={() => {
                 // Re-probe rather than trusting the answer from start-up: the GPU may have
                 // come back since, and there is no event that says so.
-                const available = probeWebGL();
+                const available = refreshVisionSupport();
                 setWebGL(available);
+                setVision(available);
                 if (available) {
                   setLostContext(false);
                   setMount3D(true);
@@ -595,9 +595,11 @@ export function TryOnStudio() {
         </div>
 
         {status && <p className="size-spec" aria-live="polite"><Camera size={14} /> {status}</p>}
-        {error && <p className="try-on-error" role="alert">{error}</p>}
+        {(error || !vision) && (
+          <p className="try-on-error" role="alert">{error || NO_VISION_MESSAGE}</p>
+        )}
 
-        {!webGL && (
+        {!webGL && (lostContext || vision) && (
           <p className="try-on-note">
             {lostContext
               ? "The GPU dropped the 3D view mid-session, so the flat one took over — it needs no GPU and cannot fail this way. Press 3D to try again."
