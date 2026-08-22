@@ -871,6 +871,27 @@ img { display: block; max-width: 100%; }
    Not display:none - that resizes the drawing buffer to nothing and back on every toggle. */
 .stage-3d.is-stowed { opacity: 0; pointer-events: none; }
 
+/* The twin and the customer wearing it, side by side. Stacks on a phone, where a camera
+   preview and a turntable both want the full width. */
+.twin-split { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
+.twin-half { position: relative; display: flex; flex-direction: column; background: var(--paper, #fffefa); min-width: 0; }
+.twin-half-label {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.twin-stage { position: relative; flex: 1; min-height: 0; }
+.twin-half .live-tryon { flex: 1; min-height: 0; padding: 14px; gap: 10px; }
+.twin-half .live-stage { flex: 1; min-height: 0; aspect-ratio: auto; }
+@media (max-width: 900px) {
+  .twin-split { position: static; grid-template-columns: 1fr; }
+  .twin-stage { min-height: 320px; }
+  .twin-half .live-stage { min-height: 320px; }
+}
+
 /* Live camera try-on. Canvas 2D and WASM only - no WebGL anywhere in this path. */
 .live-tryon { display: flex; flex-direction: column; gap: 14px; width: 100%; }
 .live-stage {

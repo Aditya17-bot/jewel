@@ -9,9 +9,18 @@
 // keeping one implementation means the two cannot drift apart.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { FaceLandmarker } from "@mediapipe/tasks-vision";
-import { getVideoLandmarker, readVideoFrame, startCamera, type CameraHandle } from "../tryon/camera";
+import type { FaceLandmarker, HandLandmarker } from "@mediapipe/tasks-vision";
+import {
+  getHandLandmarker,
+  getVideoLandmarker,
+  readHandFrame,
+  readVideoFrame,
+  startCamera,
+  type CameraHandle,
+} from "../tryon/camera";
 import { readFace } from "../tryon/compose";
+
+export type WornAs = "ears" | "finger";
 
 interface LiveTryOnProps {
   /** Matted PNG of the piece, drawn at each ear. */
@@ -19,6 +28,11 @@ interface LiveTryOnProps {
   pieceLabel: string;
   /** Real width of the piece, in millimetres. A 24 mm hoop is drawn 24 mm wide. */
   pieceWidthMm?: number;
+  /** Matted PNG of a ring, drawn on the ring finger of every hand in frame. */
+  ringSrc?: string;
+  ringLabel?: string;
+  /** Outer diameter of the band, in millimetres. */
+  ringWidthMm?: number;
 }
 
 type Status = "idle" | "starting" | "live" | "error";
@@ -31,31 +45,45 @@ const MESSAGES: Record<string, string> = {
   "model-failed": "The face model could not be loaded.",
 };
 
-export function LiveTryOn({ pieceSrc, pieceLabel, pieceWidthMm = 24 }: LiveTryOnProps) {
+/** Decodes an image and keeps it in a ref, or clears the ref when there is none. */
+function useDecodedImage(src: string | undefined) {
+  const ref = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    ref.current = null;
+    if (!src) return undefined;
+    let cancelled = false;
+    const image = new Image();
+    // Drawing an <img> that has not finished loading silently draws nothing, which reads
+    // as "tracking is broken" rather than "the picture is still coming".
+    image.onload = () => {
+      if (!cancelled) ref.current = image;
+    };
+    image.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+  return ref;
+}
+
+export function LiveTryOn({
+  pieceSrc,
+  pieceLabel,
+  pieceWidthMm = 24,
+  ringSrc,
+  ringLabel,
+  ringWidthMm = 21,
+}: LiveTryOnProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cameraRef = useRef<CameraHandle | null>(null);
   const rafRef = useRef(0);
-  const pieceRef = useRef<HTMLImageElement | null>(null);
+  const pieceRef = useDecodedImage(pieceSrc || undefined);
+  const ringRef = useDecodedImage(ringSrc);
 
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState(false);
-
-  // Decode the piece once. Drawing an <img> that has not finished loading silently draws
-  // nothing, which reads as "tracking is broken" rather than "the image is still coming".
-  useEffect(() => {
-    let cancelled = false;
-    const image = new Image();
-    image.onload = () => {
-      if (!cancelled) pieceRef.current = image;
-    };
-    image.src = pieceSrc;
-    return () => {
-      cancelled = true;
-      pieceRef.current = null;
-    };
-  }, [pieceSrc]);
 
   const stop = useCallback(() => {
     window.cancelAnimationFrame(rafRef.current);
@@ -78,8 +106,11 @@ export function LiveTryOn({ pieceSrc, pieceLabel, pieceWidthMm = 24 }: LiveTryOn
     setError(null);
 
     let landmarker: FaceLandmarker;
+    let hands: HandLandmarker | null = null;
     try {
       landmarker = await getVideoLandmarker();
+      // Another 7.5 MB, so it is only fetched when there is a ring to put on a finger.
+      if (ringSrc) hands = await getHandLandmarker();
     } catch {
       setStatus("error");
       setError(MESSAGES["model-failed"]);
@@ -124,39 +155,47 @@ export function LiveTryOn({ pieceSrc, pieceLabel, pieceWidthMm = 24 }: LiveTryOn
       lastTimestamp = timestamp;
 
       let readout = null;
+      let ringPlacements: ReturnType<typeof readHandFrame> = [];
       try {
         readout = readVideoFrame(landmarker, video, timestamp, canvas);
+        if (hands) ringPlacements = readHandFrame(hands, video, timestamp, width, height);
       } catch {
         return; // a dropped frame is not worth tearing the session down for
       }
-      if (!readout) {
-        setTracking(false);
-        return;
-      }
-      setTracking(true);
 
-      const face = readFace(readout);
+      setTracking(Boolean(readout) || ringPlacements.length > 0);
+
       const piece = pieceRef.current;
-      if (!piece?.naturalWidth) return;
+      if (readout && piece?.naturalWidth) {
+        const face = readFace(readout);
+        const drawWidth = pieceWidthMm * face.pxPerMm;
+        const drawHeight = (drawWidth * piece.naturalHeight) / piece.naturalWidth;
+        for (const ear of face.ears) {
+          // Drawn upright rather than rotated with the head: the ear decides where a piece
+          // hangs from, gravity decides which way it then hangs.
+          context.drawImage(piece, ear.x - drawWidth / 2, ear.y, drawWidth, drawHeight);
+        }
+      }
 
-      const drawWidth = pieceWidthMm * face.pxPerMm;
-      const drawHeight = (drawWidth * piece.naturalHeight) / piece.naturalWidth;
-
-      for (const ear of face.ears) {
-        // Drawn upright rather than rotated with the head: the ear decides where a piece
-        // hangs from, gravity decides which way it then hangs.
-        context.drawImage(
-          piece,
-          ear.x - drawWidth / 2,
-          ear.y,
-          drawWidth,
-          drawHeight,
-        );
+      const ring = ringRef.current;
+      if (ring?.naturalWidth) {
+        for (const place of ringPlacements) {
+          const bandWidth = ringWidthMm * place.pxPerMm;
+          const bandHeight = (bandWidth * ring.naturalHeight) / ring.naturalWidth;
+          context.save();
+          context.translate(place.x, place.y);
+          // The band's axis runs across the finger, so the picture is turned a quarter
+          // turn from the finger's own direction. Unlike an earring this does follow the
+          // limb: a ring is fixed to the finger, not hanging from it.
+          context.rotate(place.angle + Math.PI / 2);
+          context.drawImage(ring, -bandWidth / 2, -bandHeight / 2, bandWidth, bandHeight);
+          context.restore();
+        }
       }
     };
 
     rafRef.current = window.requestAnimationFrame(frame);
-  }, [pieceWidthMm]);
+  }, [pieceRef, pieceWidthMm, ringRef, ringSrc, ringWidthMm]);
 
   return (
     <div className="live-tryon">
@@ -169,7 +208,11 @@ export function LiveTryOn({ pieceSrc, pieceLabel, pieceWidthMm = 24 }: LiveTryOn
           </div>
         )}
         {status === "live" && !tracking && (
-          <p className="live-hint">Looking for a face — face the camera and make sure the light is on you.</p>
+          <p className="live-hint">
+            {ringSrc
+              ? "Looking for you — face the camera, and hold a hand up to see the ring."
+              : "Looking for a face — face the camera and make sure the light is on you."}
+          </p>
         )}
       </div>
 
@@ -181,7 +224,7 @@ export function LiveTryOn({ pieceSrc, pieceLabel, pieceWidthMm = 24 }: LiveTryOn
             {status === "starting" ? "Starting…" : "Try it on with my camera"}
           </button>
         )}
-        <span className="live-piece">{pieceLabel}</span>
+        <span className="live-piece">{[pieceLabel, ringLabel].filter(Boolean).join(" · ")}</span>
       </div>
     </div>
   );

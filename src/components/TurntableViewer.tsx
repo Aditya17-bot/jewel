@@ -1,31 +1,25 @@
-// The ring, turnable, without a GPU.
+// A twin you can turn, without a GPU.
 //
-// This is what a visitor gets when the browser gives us no WebGL context - which is not an
-// edge case: it is what happens on a machine with hardware acceleration off, on a locked
-// down work laptop, and on the developer's own machine. The old fallback was a single
-// studio photograph, which answered "why is there nothing here" correctly and answered
-// "what does this ring look like from the side" not at all.
+// Takes frames and nothing else, so it does not know or care whether they were rendered
+// from a mesh we own or generated from a single photograph. A rendered twin arrives as 24
+// azimuths on 2 elevations; a generated one as 6 on 1. The only visible difference is how
+// coarsely it steps and whether tilting does anything, and both fall out of the array
+// shape rather than a flag.
 //
-// Frames are rendered from RingModel itself by tools/turntable, so this and the live 3D
-// viewer cannot disagree about what the piece looks like. See tools/README.md.
+// This is also what a browser with no WebGL gets on the product page. Not an edge case:
+// acceleration switched off, a locked-down laptop, or a GPU process the browser has given
+// up on all land here.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MetalId, StoneId } from "../types";
-
-export interface TurntableManifest {
-  azimuths: number;
-  step: number;
-  elevations: number[];
-  size: number;
-  configurations: string[];
-}
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface TurntableViewerProps {
-  manifest: TurntableManifest;
-  metal: MetalId;
-  stone: StoneId;
-  /** Rendered when this configuration was never baked. */
-  fallback: React.ReactNode;
+  /** Outer array is elevation tiers, inner is azimuth. URLs under public/. */
+  frames: string[][];
+  /** Elevation of each tier in degrees, for the readout. */
+  elevations?: number[];
+  label: string;
+  /** Rendered when there are no frames at all. */
+  fallback?: React.ReactNode;
 }
 
 /** Roughly a full turn per wrist movement, which is what a product spinner trains people to expect. */
@@ -34,13 +28,10 @@ const PIXELS_PER_TURN = 420;
  *  vertical wobble inside an ordinary horizontal drag. */
 const TILT_THRESHOLD = 90;
 
-function framePath(config: string, elevation: number, azimuth: number) {
-  return `/turntable/${config}/frame_${elevation}_${String(azimuth).padStart(2, "0")}.webp`;
-}
-
-export function TurntableViewer({ manifest, metal, stone, fallback }: TurntableViewerProps) {
-  const config = `${metal}-${stone}`;
-  const available = manifest.configurations.includes(config);
+export function TurntableViewer({ frames, elevations, label, fallback }: TurntableViewerProps) {
+  const azimuths = frames[0]?.length ?? 0;
+  const tiers = frames.length;
+  const step = azimuths ? 360 / azimuths : 0;
 
   const azimuthRef = useRef(0);
   const velocityRef = useRef(0);
@@ -53,24 +44,15 @@ export function TurntableViewer({ manifest, metal, stone, fallback }: TurntableV
   const [azimuthLabel, setAzimuthLabel] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
-  const frames = useMemo(
-    () =>
-      manifest.elevations.map((_, elevation) =>
-        Array.from({ length: manifest.azimuths }, (_, azimuth) =>
-          framePath(config, elevation, azimuth),
-        ),
-      ),
-    [config, manifest.azimuths, manifest.elevations],
-  );
-
   // Every frame is in the DOM, so the browser is already fetching all of them - this only
-  // decides when the stage stops saying "loading". Gate that on the level tier alone: a
-  // drag sideways is what people try first, and holding the whole thing back for the
-  // tilted tier would delay readiness for a view most visitors never ask for.
+  // decides when the stage stops saying "loading". Gate that on the first tier alone: a
+  // drag sideways is what people try first, and holding readiness back for a tilted tier
+  // would delay a view most visitors never ask for.
   useEffect(() => {
-    if (!available) return undefined;
+    if (!azimuths) return undefined;
     let cancelled = false;
     setLoaded(false);
+    setTier(0);
 
     const decode = (src: string) =>
       new Promise<void>((resolve) => {
@@ -87,16 +69,17 @@ export function TurntableViewer({ manifest, metal, stone, fallback }: TurntableV
     return () => {
       cancelled = true;
     };
-  }, [available, frames]);
+  }, [azimuths, frames]);
 
   const apply = useCallback(() => {
+    if (!azimuths) return;
     const wrapped = ((azimuthRef.current % 360) + 360) % 360;
-    setFrame(Math.round(wrapped / manifest.step) % manifest.azimuths);
+    setFrame(Math.round(wrapped / step) % azimuths);
     setAzimuthLabel(Math.round(wrapped));
-  }, [manifest.azimuths, manifest.step]);
+  }, [azimuths, step]);
 
   useEffect(() => {
-    if (!available) return undefined;
+    if (!azimuths) return undefined;
     let raf = 0;
     const spin = () => {
       if (!draggingRef.current && Math.abs(velocityRef.current) > 0.06) {
@@ -108,9 +91,9 @@ export function TurntableViewer({ manifest, metal, stone, fallback }: TurntableV
     };
     raf = window.requestAnimationFrame(spin);
     return () => window.cancelAnimationFrame(raf);
-  }, [apply, available]);
+  }, [apply, azimuths]);
 
-  if (!available) return <>{fallback}</>;
+  if (!azimuths) return <>{fallback ?? null}</>;
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     draggingRef.current = true;
@@ -128,13 +111,13 @@ export function TurntableViewer({ manifest, metal, stone, fallback }: TurntableV
     velocityRef.current = -dx * (360 / PIXELS_PER_TURN);
     azimuthRef.current += velocityRef.current;
 
-    tiltCarryRef.current += dy;
-    while (Math.abs(tiltCarryRef.current) > TILT_THRESHOLD) {
-      const direction = tiltCarryRef.current > 0 ? -1 : 1;
-      setTier((current) =>
-        Math.max(0, Math.min(manifest.elevations.length - 1, current + direction)),
-      );
-      tiltCarryRef.current -= direction * -TILT_THRESHOLD;
+    if (tiers > 1) {
+      tiltCarryRef.current += dy;
+      while (Math.abs(tiltCarryRef.current) > TILT_THRESHOLD) {
+        const direction = tiltCarryRef.current > 0 ? -1 : 1;
+        setTier((current) => Math.max(0, Math.min(tiers - 1, current + direction)));
+        tiltCarryRef.current -= direction * -TILT_THRESHOLD;
+      }
     }
     apply();
   };
@@ -148,44 +131,47 @@ export function TurntableViewer({ manifest, metal, stone, fallback }: TurntableV
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "ArrowRight") azimuthRef.current += manifest.step;
-    else if (event.key === "ArrowLeft") azimuthRef.current -= manifest.step;
-    else if (event.key === "ArrowUp") {
-      setTier((current) => Math.min(manifest.elevations.length - 1, current + 1));
-    } else if (event.key === "ArrowDown") setTier((current) => Math.max(0, current - 1));
+    if (event.key === "ArrowRight") azimuthRef.current += step;
+    else if (event.key === "ArrowLeft") azimuthRef.current -= step;
+    else if (event.key === "ArrowUp") setTier((current) => Math.min(tiers - 1, current + 1));
+    else if (event.key === "ArrowDown") setTier((current) => Math.max(0, current - 1));
     else return;
     velocityRef.current = 0;
     apply();
     event.preventDefault();
   };
 
+  const elevationLabel = elevations?.[tier];
+
   return (
     <div
       className={loaded ? "turntable is-ready" : "turntable"}
       tabIndex={0}
       role="img"
-      aria-label={`The R-1028 halo ring in ${metal} gold with a ${stone} centre stone. Drag sideways to turn it, up and down to change the viewing height.`}
+      aria-label={`${label}. Drag sideways to turn it${tiers > 1 ? ", up and down to change the viewing height" : ""}.`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       onKeyDown={onKeyDown}
     >
-      {frames.map((row, elevation) =>
-        row.map((src, azimuth) => (
+      {frames.map((row, rowIndex) =>
+        row.map((src, index) => (
           <img
             key={src}
             src={src}
             alt=""
             aria-hidden="true"
             draggable={false}
-            className={elevation === tier && azimuth === frame ? "is-shown" : undefined}
+            className={rowIndex === tier && index === frame ? "is-shown" : undefined}
           />
         )),
       )}
       {!loaded && <p className="turntable-loading"><span /> Loading views…</p>}
       <p className="turntable-angle">
-        <b>{String(azimuthLabel).padStart(3, "0")}°</b> · drag to turn
+        <b>{String(azimuthLabel).padStart(3, "0")}°</b>
+        {elevationLabel !== undefined && tiers > 1 ? <> · {elevationLabel >= 0 ? "+" : "−"}{Math.abs(elevationLabel)}°</> : null}
+        {" · drag to turn"}
       </p>
     </div>
   );

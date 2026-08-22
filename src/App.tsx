@@ -1,4 +1,3 @@
-import { LockSimple } from "@phosphor-icons/react";
 import { useEffect, useMemo, useState } from "react";
 import { BrandHeader } from "./components/BrandHeader";
 import { CertificateModal } from "./components/CertificateModal";
@@ -6,10 +5,10 @@ import { Configurator } from "./components/Configurator";
 import { DigitalTwinViewer } from "./components/DigitalTwinViewer";
 import { LandingHero } from "./components/LandingHero";
 import { LeadDrawer } from "./components/LeadDrawer";
-import { LiveTryOn } from "./components/LiveTryOn";
 import { ShareDrawer } from "./components/ShareDrawer";
 import { SupportingExperience } from "./components/SupportingExperience";
 import { TryOnStudio } from "./components/TryOnStudio";
+import { TwinTryOn } from "./components/TwinTryOn";
 import { TrustStrip } from "./components/TrustStrip";
 import {
   defaultConfiguration,
@@ -117,50 +116,7 @@ export function App() {
           </section>
           <TryOnStudio />
 
-          {/* The customer-facing half of the product: point a camera at yourself and the
-              piece lands on your ear. Kept as its own section rather than a mode inside
-              the studio, because it is a different thing a different person does. */}
-          <section className="digital-twin-workspace" id="live-try-on">
-            <div className="viewer-shell">
-              <div className="product-stage three-stage try-on-stage">
-                <LiveTryOn
-                  pieceSrc="/pieces/rose-halo-stud.png"
-                  pieceLabel="E-2419 · Rose Halo Studs"
-                  pieceWidthMm={9}
-                />
-              </div>
-            </div>
-            <aside className="configurator" aria-label="Live try-on">
-              <div className="product-heading">
-                <div>
-                  <span className="product-id">Live</span>
-                  <h2>See it on your ear</h2>
-                  <p>Tracked in this tab&nbsp;&nbsp;·&nbsp;&nbsp;sized in real millimetres</p>
-                </div>
-                <div className="protected-product">
-                  <LockSimple size={28} weight="regular" />
-                  <span><strong>Never uploaded</strong><small>Frames stay on this device.</small></span>
-                </div>
-              </div>
-              <div className="config-section">
-                <span className="config-label"><b>1.</b> Start the camera</span>
-                <p className="size-spec">
-                  The camera only opens when you press the button, and closes when you press stop.
-                  Frames go into the face model and straight back onto the screen — none is sent
-                  anywhere, and none is kept.
-                </p>
-              </div>
-              <div className="config-section">
-                <span className="config-label"><b>2.</b> How it is sized</span>
-                <p className="size-spec">
-                  The distance between your irises is the one real measurement a camera gives up,
-                  so a 9&nbsp;mm stud is drawn 9&nbsp;mm wide. It assumes an average 63&nbsp;mm
-                  between pupils — right within a few percent for most adults, and not a
-                  measurement tool.
-                </p>
-              </div>
-            </aside>
-          </section>
+          <TwinTryOn />
 
           <TrustStrip />
           <SupportingExperience

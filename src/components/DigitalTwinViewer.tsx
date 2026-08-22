@@ -7,13 +7,22 @@ import {
 } from "@phosphor-icons/react";
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useThree } from "@react-three/fiber";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { getConfigurationAsset, getRingSizeSpec } from "../data/demoData";
 import type { MetalId, RingSize, StoneId } from "../types";
 import { RingModel } from "./RingModel";
-import { TurntableViewer, type TurntableManifest } from "./TurntableViewer";
+import { TurntableViewer } from "./TurntableViewer";
+
+/** What tools/turntable/grab-matrix.mjs writes alongside the frames. */
+interface TurntableManifest {
+  azimuths: number;
+  step: number;
+  elevations: number[];
+  size: number;
+  configurations: string[];
+}
 
 interface DigitalTwinViewerProps {
   metal: MetalId;
@@ -143,6 +152,20 @@ export function DigitalTwinViewer({ metal, stone, size }: DigitalTwinViewerProps
     return () => abort.abort();
   }, [webGlAvailable]);
 
+  // Frame URLs for this configuration, or an empty list when it was never baked - which
+  // the viewer answers with the still image rather than an empty stage.
+  const frames = useMemo(() => {
+    if (!manifest) return [];
+    const config = `${metal}-${stone}`;
+    if (!manifest.configurations.includes(config)) return [];
+    return manifest.elevations.map((_, tier) =>
+      Array.from(
+        { length: manifest.azimuths },
+        (_, index) => `/turntable/${config}/frame_${tier}_${String(index).padStart(2, "0")}.webp`,
+      ),
+    );
+  }, [manifest, metal, stone]);
+
   useEffect(() => {
     const syncFullscreen = () => {
       if (!document.fullscreenElement) setExpanded(false);
@@ -206,18 +229,12 @@ export function DigitalTwinViewer({ metal, stone, size }: DigitalTwinViewerProps
           // than explain why there is nothing to look at, serve frames rendered from the
           // same RingModel by tools/turntable: the visitor can still turn the ring and
           // still see the side and the gallery, which is what they came for.
-          <>
-            {manifest ? (
-              <TurntableViewer
-                manifest={manifest}
-                metal={metal}
-                stone={stone}
-                fallback={<StillImage metal={metal} stone={stone} size={size} />}
-              />
-            ) : (
-              <StillImage metal={metal} stone={stone} size={size} />
-            )}
-          </>
+          <TurntableViewer
+            frames={frames}
+            elevations={manifest?.elevations}
+            label={`The R-1028 halo ring in ${metal} gold with a ${stone} centre stone`}
+            fallback={<StillImage metal={metal} stone={stone} size={size} />}
+          />
         ) : (
           <>
             {!ready && <div className="viewer-loading"><span /> Building protected 3D twin…</div>}
