@@ -184,18 +184,18 @@ export function TurntableViewer({
       onPointerCancel={endDrag}
       onKeyDown={onKeyDown}
     >
-      {frames.map((row, rowIndex) =>
-        row.map((src, index) => (
-          <img
-            key={src}
-            src={src}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-            className={rowIndex === tier && index === frame ? "is-shown" : undefined}
-          />
-        )),
-      )}
+      {/* One element, not one per frame. Stacking every frame and toggling opacity put
+          around 120 images in the document across the page and made scrolling crawl; the
+          frames are preloaded above, so they are already in the cache and swapping the
+          src is a lookup rather than a fetch or a decode. */}
+      <img
+        src={frames[tier]?.[frame] ?? frames[0][0]}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        decoding="sync"
+        className="is-shown"
+      />
       {!loaded && <p className="turntable-loading"><span /> Loading views…</p>}
       {bare ? null : <p className="turntable-angle">
         <b>{String(azimuthLabel).padStart(3, "0")}°</b>

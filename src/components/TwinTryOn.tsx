@@ -25,7 +25,7 @@ export function TwinTryOn() {
   const ringPiece = piece.wornOn === "finger" ? piece : undefined;
 
   return (
-    <section className="digital-twin-workspace" id="live-try-on">
+    <section className="digital-twin-workspace" id="try-on">
       <div className="viewer-shell">
         <div className="twin-split">
           <div className="twin-half">

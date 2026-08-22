@@ -50,6 +50,7 @@ const MESSAGES: Record<string, string> = {
   "camera-denied": "Camera access was refused. Allow it for this site, then press Start again.",
   "camera-missing": "No camera was found on this device.",
   "camera-unsupported": "This browser will not open a camera. Chrome, Edge, Firefox and Safari all will.",
+  "camera-busy": "The camera is already in use. Close any other app or tab using it — Zoom, Teams, another browser window — then press Start again.",
   "camera-failed": "The camera would not start. Close anything else using it and try again.",
   "model-failed": "The face model could not be loaded.",
 };

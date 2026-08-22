@@ -138,18 +138,38 @@ export interface CameraHandle {
 export async function startCamera(video: HTMLVideoElement): Promise<CameraHandle> {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('camera-unsupported');
 
-  let stream: MediaStream;
-  try {
-    // 960x540 rather than 720p. Inference cost scales with the frame, the landmarks are no
-    // better at the larger size, and the canvas this ends up on is smaller than either.
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 540 } },
-      audio: false,
-    });
-  } catch (error) {
-    const name = (error as DOMException)?.name;
+  // Ask for as little as possible, then use whatever the camera gives.
+  //
+  // Real webcams are not all 16:9. An `ideal` width and height is documented as a soft
+  // preference, but some drivers - including the 640x480 4:3 module in this laptop -
+  // answer a 16:9 request with NotReadableError: Could not start video source rather than
+  // negotiating down. Asking for a resolution we do not actually need turned a working
+  // camera into a broken feature, so the only constraint left is which way it faces, and
+  // even that is dropped if it is refused.
+  const attempts: MediaStreamConstraints[] = [
+    { video: { facingMode: 'user' }, audio: false },
+    { video: true, audio: false },
+  ];
+
+  let stream: MediaStream | null = null;
+  let lastError: unknown = null;
+  for (const constraints of attempts) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      break;
+    } catch (error) {
+      lastError = error;
+      const name = (error as DOMException)?.name;
+      // A refusal or an absent device will not be fixed by asking again more loosely.
+      if (name === 'NotAllowedError' || name === 'SecurityError' || name === 'NotFoundError') break;
+    }
+  }
+
+  if (!stream) {
+    const name = (lastError as DOMException)?.name;
     if (name === 'NotAllowedError' || name === 'SecurityError') throw new Error('camera-denied');
-    if (name === 'NotFoundError' || name === 'OverconstrainedError') throw new Error('camera-missing');
+    if (name === 'NotFoundError') throw new Error('camera-missing');
+    if (name === 'NotReadableError' || name === 'AbortError') throw new Error('camera-busy');
     throw new Error('camera-failed');
   }
 

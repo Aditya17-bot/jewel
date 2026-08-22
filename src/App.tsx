@@ -8,7 +8,6 @@ import { LeadDrawer } from "./components/LeadDrawer";
 import { SectionBoundary } from "./components/SectionBoundary";
 import { ShareDrawer } from "./components/ShareDrawer";
 import { SupportingExperience } from "./components/SupportingExperience";
-import { TryOnStudio } from "./components/TryOnStudio";
 import { TwinTryOn } from "./components/TwinTryOn";
 import { TrustStrip } from "./components/TrustStrip";
 import {
@@ -115,7 +114,6 @@ export function App() {
               onCertificate={() => setCertificateOpen(true)}
             />
           </section>
-          <TryOnStudio />
 
           <SectionBoundary label="Try it on">
             <TwinTryOn />
