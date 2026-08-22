@@ -917,7 +917,11 @@ img { display: block; max-width: 100%; }
 }
 .twin-stage { position: relative; flex: 1; min-height: 0; }
 .twin-half .live-tryon { flex: 1; min-height: 0; padding: 14px; gap: 10px; }
-.twin-half .live-stage { flex: 1; min-height: 0; aspect-ratio: auto; }
+/* The camera keeps its own 4:3 rather than being stretched to fill the column. Letting it
+   take the column's shape and then covering it cropped a 640x480 webcam to the middle
+   third and magnified what was left - which reads as a distorted, zoomed-in picture, and
+   put a hand held anywhere but dead centre outside the frame entirely. */
+.twin-half .live-stage { width: 100%; aspect-ratio: 4 / 3; min-height: 0; }
 @media (max-width: 900px) {
   .twin-split { position: static; grid-template-columns: 1fr; }
   .twin-stage { min-height: 320px; }
@@ -937,7 +941,9 @@ img { display: block; max-width: 100%; }
 /* The video is the source the model reads, never what anyone looks at: the canvas carries
    the mirrored frame with the piece already composited onto it. */
 .live-video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.live-canvas { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* contain, not cover: the whole camera frame is what the models see, so it has to be what
+   the person sees too. Cropping it hides the piece whenever a hand drifts off centre. */
+.live-canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 .live-placeholder {
   position: absolute;
   inset: 0;

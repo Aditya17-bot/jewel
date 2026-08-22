@@ -61,7 +61,7 @@ const H = {
   ringMcp: 13, // knuckle
   ringPip: 14, // first joint
   indexMcp: 5,
-  middleMcp: 9,
+  middleMcp: 9,  // the knuckle the hand's own long axis runs to
   pinkyMcp: 17,
 };
 
@@ -104,6 +104,18 @@ export interface HandReading {
   spread: number;
   /** Angle of the thumb-to-index line, in radians. */
   pinchAngle: number;
+  /**
+   * Angle of the hand itself: wrist to middle knuckle, in radians.
+   *
+   * This is the one to turn a piece with. The thumb-to-index line looks like the obvious
+   * choice and is a poor one - it only swings about forty degrees before the pinch comes
+   * apart, and both its ends are fingertips, which are the noisiest landmarks the model
+   * returns. The hand's long axis goes right round as the wrist turns and is anchored at
+   * two of the steadiest points on the hand.
+   */
+  handAngle: number;
+  /** Centre of the palm, in canvas pixels. Steadier than any fingertip. */
+  palm: { x: number; y: number };
   /** Knuckle span in pixels, the hand's own scale. */
   span: number;
 }
@@ -173,6 +185,11 @@ export function readHands(
         pinch: { x: (thumb.x + finger.x) / 2, y: (thumb.y + finger.y) / 2 },
         spread,
         pinchAngle: Math.atan2(finger.y - thumb.y, finger.x - thumb.x),
+        handAngle: Math.atan2(at(H.middleMcp).y - at(H.wrist).y, at(H.middleMcp).x - at(H.wrist).x),
+        palm: {
+          x: (at(H.wrist).x + at(H.middleMcp).x) / 2,
+          y: (at(H.wrist).y + at(H.middleMcp).y) / 2,
+        },
         span,
       },
     ];

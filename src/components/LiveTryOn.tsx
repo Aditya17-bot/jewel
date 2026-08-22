@@ -147,6 +147,41 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
   const [mode, setMode] = useState<Mode>("worn");
   const [readout, setReadout] = useState<{ scale: number; azimuth: number } | null>(null);
 
+  // The models, and whether a load is already in flight for each.
+  //
+  // Held here rather than inside start() because which models are needed changes while the
+  // camera is running: move an uploaded piece from a finger to an ear and the face model
+  // is suddenly required. Deciding once at start meant that piece simply never appeared -
+  // the face model had not been asked for, so there were never any face landmarks.
+  const faceModel = useRef<FaceLandmarker | null>(null);
+  const handModel = useRef<HandLandmarker | null>(null);
+  const loading = useRef({ face: false, hands: false });
+  const [modelError, setModelError] = useState<string | null>(null);
+
+  const needFace = useCallback(() => {
+    if (faceModel.current || loading.current.face) return;
+    loading.current.face = true;
+    getVideoLandmarker()
+      .then((model) => {
+        faceModel.current = model;
+      })
+      .catch((caught: Error) => {
+        setModelError(caught?.message === "no-webgl" ? NO_VISION_MESSAGE : MESSAGES["model-failed"]);
+      });
+  }, []);
+
+  const needHands = useCallback(() => {
+    if (handModel.current || loading.current.hands) return;
+    loading.current.hands = true;
+    getHandLandmarker()
+      .then((model) => {
+        handModel.current = model;
+      })
+      .catch((caught: Error) => {
+        setModelError(caught?.message === "no-webgl" ? NO_VISION_MESSAGE : MESSAGES["model-failed"]);
+      });
+  }, []);
+
   // Gesture state lives in refs: it is written by the animation loop many times a second,
   // and reading it back through React state would re-render the tree at that same rate.
   const scaleRef = useRef(1);
@@ -189,16 +224,14 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
     setStatus("starting");
     setError(null);
 
-    // The face model is only worth its download when the piece hangs off a face. The hand
-    // model is always loaded now: it places a ring, and it is also how any piece is turned
-    // and resized, whatever it is worn on.
+    // Asked for up front so the first frames are not blank, but not awaited exclusively -
+    // the loop below asks again for whatever the piece needs at the time, so changing
+    // where a piece is worn mid-session fetches the model that placement requires.
     const wantsFace = pieceRef.current.wornOn !== "finger";
-
-    let landmarker: FaceLandmarker | null = null;
-    let hands: HandLandmarker | null = null;
     try {
-      if (wantsFace) landmarker = await getVideoLandmarker();
-      hands = await getHandLandmarker();
+      if (wantsFace) await getVideoLandmarker().then((model) => (faceModel.current = model));
+      await getHandLandmarker().then((model) => (handModel.current = model));
+      loading.current = { face: wantsFace, hands: true };
     } catch (caught) {
       setStatus("error");
       setError(
@@ -256,13 +289,16 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
       // preview stays at the display's rate while inference runs at a fraction of it.
       if (timestamp - lastDetect >= DETECT_INTERVAL_MS) {
         lastDetect = timestamp;
+        // Whatever the piece needs right now, not whatever it needed when Start was pressed.
+        if (pieceRef.current.wornOn !== "finger") needFace();
+        needHands();
         try {
-          if (landmarker) {
-            const view = readVideoFrame(landmarker, video, timestamp, canvas);
+          if (faceModel.current) {
+            const view = readVideoFrame(faceModel.current, video, timestamp, canvas);
             heldFace = view ? readFace(view) : null;
           }
-          if (hands) {
-            heldHands = readHands(hands, video, timestamp, width, height, wasPinching);
+          if (handModel.current) {
+            heldHands = readHands(handModel.current, video, timestamp, width, height, wasPinching);
             wasPinching = heldHands.map((hand) => hand.pinching);
           }
         } catch {
@@ -331,14 +367,31 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
         const holder = grabbing ?? heldHands[0];
         if (holder) {
           const size = holder.span * AIR_SIZE * scaleRef.current;
-          // Turn your wrist and the piece turns with it - through the twin's own views if
-          // it has them, in the plane of the picture if it has only the one.
-          const turn =
-            count > 1
-              ? Math.round((holder.pinchAngle / (Math.PI * 2)) * count + count * 2) % count
-              : 0;
-          const angle = count > 1 ? 0 : holder.pinchAngle;
-          stamp(context, images[turn] ?? image, holder.pinch.x, holder.pinch.y, size, angle);
+          // Turn your hand and the piece turns with it - through the twin's own views if it
+          // has them, in the plane of the picture if it has only the one.
+          //
+          // Driven by the hand's long axis, not by the thumb-to-index line. The line
+          // between two fingertips was the first thing tried and it barely moved: it swings
+          // about forty degrees before a pinch comes apart, and fingertips jitter. The
+          // wrist-to-knuckle axis goes right round and sits on two steady landmarks.
+          //
+          // Measured from pointing straight up, because that is how a hand is held out to
+          // be looked at, and it should be the piece's front view when it is.
+          const turned = holder.handAngle + Math.PI / 2;
+          const wrap = ((turned % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+          const turn = count > 1 ? Math.round((wrap / (Math.PI * 2)) * count) % count : 0;
+          const angle = count > 1 ? 0 : wrap;
+          // Held in the palm rather than at the fingertips: the pinch point wanders to the
+          // edge of the hand as the fingers open, which makes the piece look like it is
+          // falling out.
+          const x = (holder.pinch.x + holder.palm.x) / 2;
+          const y = (holder.pinch.y + holder.palm.y) / 2;
+          stamp(context, images[turn] ?? image, x, y, size, angle);
+
+          if (timestamp - lastPublished > 140) {
+            lastPublished = timestamp;
+            setReadout({ scale: scaleRef.current, azimuth: Math.round((wrap * 180) / Math.PI) });
+          }
         }
         return;
       }
@@ -400,7 +453,7 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
     };
 
     rafRef.current = window.requestAnimationFrame(frame);
-  }, [framesRef]);
+  }, [framesRef, needFace, needHands]);
 
   const turnable = piece.frames.length > 1;
 
@@ -425,7 +478,9 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
           <p className="live-hint">
             {readout
               ? `${Math.round(readout.scale * 100)}% size · ${String(readout.azimuth).padStart(3, "0")}°`
-              : `Pinch thumb and finger, then drag sideways to ${turnable ? "turn" : "rotate"} it and up or down to resize.`}
+              : mode === "air"
+                ? `Hold a hand up — turn it to ${turnable ? "turn" : "rotate"} the piece, move it closer to make it bigger.`
+                : `Pinch thumb and finger, then drag sideways to ${turnable ? "turn" : "rotate"} it and up or down to resize.`}
           </p>
         )}
       </div>
