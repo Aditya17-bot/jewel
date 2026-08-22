@@ -55,11 +55,28 @@ export function getHandLandmarker(): Promise<HandLandmarker> {
  * first joint, nearer the knuckle.
  */
 const H = {
+  wrist: 0,
+  thumbTip: 4,
+  indexTip: 8,
   ringMcp: 13, // knuckle
   ringPip: 14, // first joint
   indexMcp: 5,
+  middleMcp: 9,
   pinkyMcp: 17,
 };
+
+/**
+ * How close thumb and index have to be to count as a pinch, as a fraction of the knuckle
+ * span. Measured against the hand's own size rather than in pixels, so it means the same
+ * thing at arm's length and up against the lens.
+ *
+ * Two thresholds, not one. A single one chatters: hold a pinch near the boundary and
+ * noise in the landmarks opens and closes it several times a second, which on screen is
+ * the piece flying between two sizes. Closing at 0.34 and only releasing at 0.46 makes
+ * the grip stick the way a real one does.
+ */
+const PINCH_CLOSE = 0.34;
+const PINCH_OPEN = 0.46;
 
 // The hand's equivalent of interpupillary distance: the span across the knuckles, which is
 // the most stable width on a hand and does not change as fingers curl. Mean adult breadth
@@ -75,30 +92,54 @@ export interface RingPlacement {
   pxPerMm: number;
 }
 
+/** One hand, as everything drawn from a hand needs it. */
+export interface HandReading {
+  /** Where a ring goes on this hand's ring finger. */
+  ring: RingPlacement;
+  /** Thumb and index brought together. Hysteretic - see PINCH_CLOSE. */
+  pinching: boolean;
+  /** Midpoint between thumb and index tips, in canvas pixels. */
+  pinch: { x: number; y: number };
+  /** Thumb-to-index gap over the knuckle span. About 0.2 shut, about 1.1 wide open. */
+  spread: number;
+  /** Angle of the thumb-to-index line, in radians. */
+  pinchAngle: number;
+  /** Knuckle span in pixels, the hand's own scale. */
+  span: number;
+}
+
 /**
- * Finds where a ring goes on every hand in the frame.
+ * Reads every hand in the frame: where a ring sits on it, and whether it is pinching.
+ *
+ * One detection for both, because they are the same inference - splitting them into a
+ * placement pass and a gesture pass would double the most expensive thing in the loop to
+ * produce two halves of one result.
  *
  * Mirrored to match the preview, exactly as the face path is. Returns an empty list rather
  * than throwing when there is no hand, because a hand leaving frame is the normal case and
  * happens many times a second.
+ *
+ * `wasPinching` carries the previous answer per hand so the pinch can be hysteretic; pass
+ * an empty array on the first call.
  */
-export function readHandFrame(
+export function readHands(
   landmarker: HandLandmarker,
   video: HTMLVideoElement,
   timestampMs: number,
   width: number,
   height: number,
-): RingPlacement[] {
+  wasPinching: boolean[] = [],
+): HandReading[] {
   if (video.readyState < 2) return [];
 
   const result = landmarker.detectForVideo(video, timestampMs);
   const hands = result.landmarks ?? [];
 
-  return hands.flatMap((hand) => {
+  return hands.flatMap((hand, index) => {
     if (!hand?.[H.pinkyMcp]) return [];
-    const at = (index: number) => ({
-      x: (1 - hand[index].x) * width,
-      y: hand[index].y * height,
+    const at = (i: number) => ({
+      x: (1 - hand[i].x) * width,
+      y: hand[i].y * height,
     });
 
     const span = Math.hypot(
@@ -109,18 +150,44 @@ export function readHandFrame(
 
     const mcp = at(H.ringMcp);
     const pip = at(H.ringPip);
+    const thumb = at(H.thumbTip);
+    const finger = at(H.indexTip);
+
+    const gap = Math.hypot(finger.x - thumb.x, finger.y - thumb.y);
+    const spread = gap / span;
+    // Hysteresis: the threshold to close a pinch is tighter than the one to release it.
+    const pinching = wasPinching[index] ? spread < PINCH_OPEN : spread < PINCH_CLOSE;
+
     // A third of the way along the proximal phalanx: where a band actually rests, rather
     // than on the knuckle itself.
     const t = 0.34;
     return [
       {
-        x: mcp.x + (pip.x - mcp.x) * t,
-        y: mcp.y + (pip.y - mcp.y) * t,
-        angle: Math.atan2(pip.y - mcp.y, pip.x - mcp.x),
-        pxPerMm: span / KNUCKLE_SPAN_MM,
+        ring: {
+          x: mcp.x + (pip.x - mcp.x) * t,
+          y: mcp.y + (pip.y - mcp.y) * t,
+          angle: Math.atan2(pip.y - mcp.y, pip.x - mcp.x),
+          pxPerMm: span / KNUCKLE_SPAN_MM,
+        },
+        pinching,
+        pinch: { x: (thumb.x + finger.x) / 2, y: (thumb.y + finger.y) / 2 },
+        spread,
+        pinchAngle: Math.atan2(finger.y - thumb.y, finger.x - thumb.x),
+        span,
       },
     ];
   });
+}
+
+/** The ring placements alone, for callers that do not care about gestures. */
+export function readHandFrame(
+  landmarker: HandLandmarker,
+  video: HTMLVideoElement,
+  timestampMs: number,
+  width: number,
+  height: number,
+): RingPlacement[] {
+  return readHands(landmarker, video, timestampMs, width, height).map((hand) => hand.ring);
 }
 
 export interface CameraHandle {

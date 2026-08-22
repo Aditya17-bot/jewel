@@ -487,7 +487,7 @@ export function TryOnStudio() {
             ))}
           </div>
           <button className="button button-outline try-on-upload" onClick={() => pieceInputRef.current?.click()}>
-            <UploadSimple size={17} /> Photograph a piece → 3D
+            <UploadSimple size={17} /> Use a photo of my own piece
           </button>
           <input
             ref={pieceInputRef}
@@ -500,6 +500,15 @@ export function TryOnStudio() {
             }}
           />
           {pieceNote && <p className="size-spec">{pieceNote}</p>}
+          {/* Said plainly, because the button used to promise "→ 3D" and hand back a flat
+              cut-out. One photograph is one view: it can be worn immediately, and it can be
+              turned only after the multi-view run has generated the other views. R-2201 in
+              the catalogue is a piece that has been through it. */}
+          <p className="size-spec">
+            A photograph is cut out and worn straight away, at the size you set. Turning it
+            needs the other views, which are generated off this machine — the jeweller submits
+            the photo once and the twin comes back with six.
+          </p>
         </div>
 
         <div className="config-section">

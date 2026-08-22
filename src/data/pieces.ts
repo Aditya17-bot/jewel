@@ -14,7 +14,9 @@
 // generated one cannot - there is one photograph and one set of views - and that is a fact
 // about where it came from, so it lives here rather than being special-cased in the UI.
 
+import type { WornPiece } from "../components/LiveTryOn";
 import type { MetalId, StoneId } from "../types";
+import { WORN } from "./worn";
 
 export type WornOn = "ears" | "finger" | "neck";
 export type TwinSource = "rendered" | "generated";
@@ -29,13 +31,36 @@ export interface Piece {
   note: string;
   /** Frames for a metal and stone. A generated piece ignores both. */
   frames(metal: MetalId, stone: StoneId): string[][];
-  /** Matted cut-out drawn onto the customer. */
+  /** Matted cut-out, for a still of the piece on its own. */
   cutout(metal: MetalId, stone: StoneId): string;
+  /** What the live camera draws on the customer, and how big it is really. */
+  worn(metal: MetalId, stone: StoneId): WornPiece;
   /** Elevation tiers behind the frames, for the readout. */
   elevations: number[];
 }
 
 const AZIMUTHS = 24;
+
+/**
+ * The worn cut-outs, from tools/tryon/build-worn.py.
+ *
+ * A turntable frame is a square with the piece somewhere inside it and a wide transparent
+ * margin around it. Handing one straight to the camera draws a 19 mm ring 19 mm wide
+ * *including the margin*, so the ring itself comes out a third too small - which is
+ * exactly why a piece used to look like a toy on a finger. These are cropped to the piece
+ * and carry the real width of the square they ended up as.
+ */
+function wornFrom(kind: "ring" | "necklace" | "earring", metal: MetalId, stone: StoneId) {
+  const combo = `${metal}-${stone}`;
+  const entry = WORN[kind]?.[combo] ?? { frames: 1, frameMm: 24 };
+  return {
+    frames: Array.from(
+      { length: entry.frames },
+      (_, index) => `/worn/${kind}/${combo}/frame_${String(index).padStart(2, "0")}.webp`,
+    ),
+    frameMm: entry.frameMm,
+  };
+}
 
 /** frame_<tier>_<nn>.webp, as the grab scripts write them. */
 function baked(dir: string, tiers: number): string[][] {
@@ -65,6 +90,12 @@ export const PIECES: Piece[] = [
     // The twin's own face-on frame, already matted. Nothing is drawn on a customer that
     // was not published as part of the twin.
     cutout: (metal, stone) => `/turntable/${metal}-${stone}/frame_0_00.webp`,
+    // All 24 views go to the camera, so the ring on a hand can be turned by hand.
+    worn: (metal, stone) => ({
+      ...wornFrom("ring", metal, stone),
+      wornOn: "finger" as const,
+      label: "R-1028 · ring finger",
+    }),
   },
   {
     id: "N-1032",
@@ -76,6 +107,13 @@ export const PIECES: Piece[] = [
     note: "Modelled in-house. Turns in 15° steps, in every metal and stone.",
     frames: (metal, stone) => baked(`/pieces-3d/necklace/${metal}-${stone}`, 1),
     cutout: (metal, stone) => `/pieces-3d/necklace/${metal}-${stone}/frame_0_00.webp`,
+    // The drop alone. The twin's chain was modelled to read as a product shot and is a
+    // third of the way round a neck; on a person the chain is drawn to fit the person.
+    worn: (metal, stone) => ({
+      ...wornFrom("necklace", metal, stone),
+      wornOn: "neck" as const,
+      label: "N-1032 · at the collarbone",
+    }),
   },
   {
     id: "E-2419",
@@ -86,8 +124,13 @@ export const PIECES: Piece[] = [
     elevations: [6],
     note: "Modelled in-house. Turns in 15° steps, in every metal and stone.",
     frames: (metal, stone) => baked(`/pieces-3d/earring/${metal}-${stone}`, 1),
-    // Cropped to the face of one stud: the post sits behind the lobe when it is worn.
-    cutout: () => "/pieces/rose-halo-stud.png",
+    cutout: (metal, stone) => `/pieces-3d/earring/${metal}-${stone}/frame_0_00.webp`,
+    // One stud of the pair, cropped to its face: the post sits behind the lobe when worn.
+    worn: (metal, stone) => ({
+      ...wornFrom("earring", metal, stone),
+      wornOn: "ears" as const,
+      label: "E-2419 · both ears",
+    }),
   },
   {
     id: "R-2201",
@@ -99,6 +142,13 @@ export const PIECES: Piece[] = [
     note: "Built from one photograph, so it turns in 60° steps and keeps its own metal.",
     frames: () => generated("/twins/heart-vine-ring"),
     cutout: () => "/pieces/heart-vine-ring.png",
+    // One photograph, so one view, and the piece in it fills the picture already.
+    worn: () => ({
+      frames: ["/pieces/heart-vine-ring.png"],
+      frameMm: 21,
+      wornOn: "finger" as const,
+      label: "R-2201 · ring finger",
+    }),
   },
 ];
 

@@ -30,11 +30,9 @@ export function TwinTryOn() {
   const frames = useMemo(() => piece.frames(metal, stone), [piece, metal, stone]);
   const cutout = piece.cutout(metal, stone);
 
-  // The camera hangs a piece on the ears or on a hand depending on what the piece is, so a
-  // ring is never drawn on an earlobe.
-  const earPiece = piece.wornOn === "ears" ? piece : undefined;
-  const wearable = piece.wornOn !== "neck";
-  const ringPiece = piece.wornOn === "finger" ? piece : undefined;
+  // The camera is handed one piece and the piece says where it goes, so a ring is never
+  // drawn on an earlobe and a pendant no longer has nowhere to go.
+  const worn = useMemo(() => piece.worn(metal, stone), [piece, metal, stone]);
 
   return (
     <section className="digital-twin-workspace" id="try-on">
@@ -58,15 +56,7 @@ export function TwinTryOn() {
           </div>
           <div className="twin-half">
             <span className="twin-half-label">On you</span>
-            <LiveTryOn
-              key={`${piece.id}-${metal}-${stone}`}
-              pieceSrc={earPiece ? cutout : ""}
-              pieceLabel={earPiece ? `${piece.id} · both ears` : ""}
-              pieceWidthMm={earPiece?.widthMm ?? 9}
-              ringSrc={ringPiece ? cutout : undefined}
-              ringLabel={ringPiece ? `${piece.id} · ring finger` : undefined}
-              ringWidthMm={ringPiece?.widthMm ?? 21}
-            />
+            <LiveTryOn key={`${piece.id}-${metal}-${stone}`} piece={worn} />
           </div>
         </div>
       </div>
@@ -141,20 +131,21 @@ export function TwinTryOn() {
             {piece.wornOn === "ears"
               ? "Start the camera and the studs land on both ears."
               : piece.wornOn === "neck"
-                ? "The camera places pieces on ears and hands. A pendant needs the collarbone, which is not tracked yet — turn the twin instead."
+                ? "Start the camera and the pendant hangs at your collarbone, on a chain drawn to fit you."
                 : "Start the camera and hold a hand up — the ring goes on your ring finger."}
-            {" "}The camera opens only when you press the button and closes when you press stop.
-            Frames go into the models and straight back onto the screen: none is sent anywhere,
-            and none is kept.
+            {" "}Pinch thumb and finger and drag to resize it
+            {worn.frames.length > 1 ? ", or sideways to turn it on your hand" : ""}. The camera
+            opens only when you press the button and closes when you press stop. Frames go into
+            the models and straight back onto the screen: none is sent anywhere, and none is kept.
           </p>
         </div>
 
         <div className="config-section">
           <span className="config-label"><b>{variable ? 4 : 3}.</b> How it is sized</span>
           <p className="size-spec">
-            {piece.wornOn === "ears"
-              ? "The distance between your irises is the one real measurement a camera gives up, so a"
-              : "The span across your knuckles is the steadiest width on a hand, so a"}
+            {piece.wornOn === "finger"
+              ? "The span across your knuckles is the steadiest width on a hand, so a"
+              : "The distance between your irises is the one real measurement a camera gives up, so a"}
             {" "}{piece.widthMm}&nbsp;mm piece is drawn {piece.widthMm}&nbsp;mm wide. Both use a
             population average, so this shows how a piece suits you — it is not a measuring tool.
           </p>

@@ -1,0 +1,116 @@
+{
+  "ring": {
+    "white-natural": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "white-ruby": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "white-emerald": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "yellow-natural": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "yellow-ruby": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "yellow-emerald": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "rose-natural": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "rose-ruby": {
+      "frames": 24,
+      "frameMm": 19.0
+    },
+    "rose-emerald": {
+      "frames": 24,
+      "frameMm": 19.0
+    }
+  },
+  "necklace": {
+    "white-natural": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "white-ruby": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "white-emerald": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "yellow-natural": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "yellow-ruby": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "yellow-emerald": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "rose-natural": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "rose-ruby": {
+      "frames": 1,
+      "frameMm": 24.0
+    },
+    "rose-emerald": {
+      "frames": 1,
+      "frameMm": 24.0
+    }
+  },
+  "earring": {
+    "white-natural": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "white-ruby": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "white-emerald": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "yellow-natural": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "yellow-ruby": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "yellow-emerald": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "rose-natural": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "rose-ruby": {
+      "frames": 1,
+      "frameMm": 9.86
+    },
+    "rose-emerald": {
+      "frames": 1,
+      "frameMm": 9.86
+    }
+  }
+}

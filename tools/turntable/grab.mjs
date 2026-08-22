@@ -18,10 +18,13 @@ const STONE = process.env.STONE || 'natural';
 const SIZE = process.env.SIZE || '16';
 const ELEVATION = process.env.ELEVATION || '8';
 const OUT = process.env.OUT || './frames';
+// The capture square. turntable.tsx renders at twice this and the screenshot downsamples,
+// so the edges are supersampled rather than merely resized.
+const SIDE = Number(process.env.SIDE || 1024);
 
 export default async function run(page) {
   mkdirSync(OUT, { recursive: true });
-  await page.setViewportSize({ width: 1024, height: 1024 });
+  await page.setViewportSize({ width: SIDE, height: SIDE });
 
   const canvas = page.locator('canvas');
   await canvas.waitFor({ state: 'attached', timeout: 60000 });

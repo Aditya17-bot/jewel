@@ -28,7 +28,7 @@ for config in sorted(os.listdir(src)):
         image = Image.open(os.path.join(folder, name)).convert("RGBA")
         image = image.resize((side, side), Image.LANCZOS)
         out = os.path.join(dst, config, name.replace(".png", ".webp"))
-        image.save(out, "WEBP", quality=86, method=4)
+        image.save(out, "WEBP", quality=90, method=4)
         total_in += os.path.getsize(os.path.join(folder, name))
         total_out += os.path.getsize(out)
         count += 1

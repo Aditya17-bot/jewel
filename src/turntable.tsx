@@ -77,7 +77,13 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
     // camera orbiting (0,0,0) keeps the head centred at the front and swings the band
     // out of frame by ninety degrees. Measuring beats hard-coding a pivot, which would
     // silently go stale the moment the size table or the shank curve changes.
-    if (!fit.current) {
+    //
+    // Measured every frame rather than cached on the first one. Suspense mounts a piece
+    // in instalments, so the first frame that contains *a* mesh does not contain all of
+    // them: the earrings were fitted to one stud and the bake cut the other in half. The
+    // camera orbits and the meshes do not, so this is pose-independent - re-measuring
+    // costs a scene traverse per baked frame and cannot make the piece breathe.
+    {
       const box = new THREE.Box3();
       const size = new THREE.Vector3();
       let found = false;
@@ -96,6 +102,7 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
       const sphere = box.getBoundingSphere(new THREE.Sphere());
       fit.current = { center: sphere.center.clone(), radius: sphere.radius };
     }
+    if (!fit.current) return;
 
     const { center, radius } = fit.current;
     const perspective = camera as THREE.PerspectiveCamera;
@@ -108,7 +115,7 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
     // approaches it face-on, so 0.92 fills the frame there without clipping the shank. A
     // pair of earrings or a chain is wide and close to its own bound in every pose, and
     // the same factor cuts the ends off - so those get room instead.
-    const fill = shot.piece === "ring" ? 0.92 : 1.12;
+    const fill = shot.piece === "ring" ? 0.98 : 1.24;
     const distance = (radius / Math.sin(((perspective.fov / 2) * Math.PI) / 180)) * fill;
 
     perspective.position.set(
@@ -149,8 +156,12 @@ function Settle({ token }: { token: string }) {
   return null;
 }
 
+/** Longest drawing-buffer edge this machine will be asked for. */
+const MAX_BUFFER = 2048;
+
 function Stage() {
   const [shot, setShot] = useState<Shot>(readHash);
+  const supersample = Math.min(2, MAX_BUFFER / Math.max(window.innerWidth, window.innerHeight));
 
   useEffect(() => {
     const sync = () => setShot(readHash());
@@ -162,7 +173,16 @@ function Stage() {
 
   return (
     <Canvas
-      dpr={1}
+      // Rendered above the capture size and downsampled by the grabber's screenshot.
+      // Supersampling is the cheapest real antialiasing there is, and a bake is offline:
+      // the extra pixels cost seconds per run and buy edges that survive being shown at
+      // 700 CSS px on a dense display.
+      //
+      // Capped by the drawing buffer rather than fixed at 2x. The machine this bakes on
+      // has 3.5 GB of usable VRAM and is already holding a PMREM probe and transmission
+      // buffers; a 2x pass at the hero's 1440px square asks for 2880 square on top of
+      // that, and a lost context halfway through a sweep is a silently broken bake.
+      dpr={supersample}
       camera={{ position: [0, 0.2, getRingSizeSpec(shot.size).cameraDistance], fov: 32, near: 0.1, far: 100 }}
       gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: "high-performance" }}
       shadows={{ type: THREE.PCFShadowMap }}
