@@ -5,6 +5,7 @@ import { Configurator } from "./components/Configurator";
 import { DigitalTwinViewer } from "./components/DigitalTwinViewer";
 import { LandingHero } from "./components/LandingHero";
 import { LeadDrawer } from "./components/LeadDrawer";
+import { SectionBoundary } from "./components/SectionBoundary";
 import { ShareDrawer } from "./components/ShareDrawer";
 import { SupportingExperience } from "./components/SupportingExperience";
 import { TryOnStudio } from "./components/TryOnStudio";
@@ -116,7 +117,9 @@ export function App() {
           </section>
           <TryOnStudio />
 
-          <TwinTryOn />
+          <SectionBoundary label="Try it on">
+            <TwinTryOn />
+          </SectionBoundary>
 
           <TrustStrip />
           <SupportingExperience

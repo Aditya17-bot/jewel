@@ -137,8 +137,10 @@ export async function startCamera(video: HTMLVideoElement): Promise<CameraHandle
 
   let stream: MediaStream;
   try {
+    // 960x540 rather than 720p. Inference cost scales with the frame, the landmarks are no
+    // better at the larger size, and the canvas this ends up on is smaller than either.
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 540 } },
       audio: false,
     });
   } catch (error) {

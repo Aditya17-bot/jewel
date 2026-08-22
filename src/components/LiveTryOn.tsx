@@ -37,6 +37,14 @@ interface LiveTryOnProps {
 
 type Status = "idle" | "starting" | "live" | "error";
 
+/**
+ * How often the models actually run, in milliseconds. About 24 detections a second, well
+ * under the display's rate: inference is the expensive part of this loop by a wide margin,
+ * and on a thin laptop running it every painted frame is enough to make the whole machine
+ * feel like it has stopped responding.
+ */
+const DETECT_INTERVAL_MS = 42;
+
 const MESSAGES: Record<string, string> = {
   "camera-denied": "Camera access was refused. Allow it for this site, then press Start again.",
   "camera-missing": "No camera was found on this device.",
@@ -105,12 +113,17 @@ export function LiveTryOn({
     setStatus("starting");
     setError(null);
 
-    let landmarker: FaceLandmarker;
+    // Only load a model that has something to place. A ring needs hands and nothing else;
+    // running the face model beside it is two inferences a frame to produce one result.
+    const wantsFace = Boolean(pieceSrc);
+    const wantsHands = Boolean(ringSrc);
+
+    let landmarker: FaceLandmarker | null = null;
     let hands: HandLandmarker | null = null;
     try {
-      landmarker = await getVideoLandmarker();
+      if (wantsFace) landmarker = await getVideoLandmarker();
       // Another 7.5 MB, so it is only fetched when there is a ring to put on a finger.
-      if (ringSrc) hands = await getHandLandmarker();
+      if (wantsHands) hands = await getHandLandmarker();
     } catch {
       setStatus("error");
       setError(MESSAGES["model-failed"]);
@@ -130,6 +143,11 @@ export function LiveTryOn({
     if (!context) return;
 
     let lastTimestamp = -1;
+    let lastDetect = 0;
+    // Landmarks that are held between detections, so the piece keeps being drawn on every
+    // painted frame rather than blinking at the detection rate.
+    let heldFace: ReturnType<typeof readFace> | null = null;
+    let heldRings: ReturnType<typeof readHandFrame> = [];
 
     const frame = () => {
       rafRef.current = window.requestAnimationFrame(frame);
@@ -154,20 +172,26 @@ export function LiveTryOn({
       const timestamp = Math.max(performance.now(), lastTimestamp + 1);
       lastTimestamp = timestamp;
 
-      let readout = null;
-      let ringPlacements: ReturnType<typeof readHandFrame> = [];
-      try {
-        readout = readVideoFrame(landmarker, video, timestamp, canvas);
-        if (hands) ringPlacements = readHandFrame(hands, video, timestamp, width, height);
-      } catch {
-        return; // a dropped frame is not worth tearing the session down for
+      // Detect on a budget rather than on every painted frame. A model inference costs
+      // far more than a drawImage, and a face does not move meaningfully in 40ms - so the
+      // preview stays at the display's rate while inference runs at a fraction of it.
+      if (timestamp - lastDetect >= DETECT_INTERVAL_MS) {
+        lastDetect = timestamp;
+        try {
+          if (landmarker) {
+            const readout = readVideoFrame(landmarker, video, timestamp, canvas);
+            heldFace = readout ? readFace(readout) : null;
+          }
+          if (hands) heldRings = readHandFrame(hands, video, timestamp, width, height);
+        } catch {
+          return; // a dropped frame is not worth tearing the session down for
+        }
+        setTracking(Boolean(heldFace) || heldRings.length > 0);
       }
 
-      setTracking(Boolean(readout) || ringPlacements.length > 0);
-
       const piece = pieceRef.current;
-      if (readout && piece?.naturalWidth) {
-        const face = readFace(readout);
+      const face = heldFace;
+      if (face && piece?.naturalWidth) {
         const drawWidth = pieceWidthMm * face.pxPerMm;
         const drawHeight = (drawWidth * piece.naturalHeight) / piece.naturalWidth;
         for (const ear of face.ears) {
@@ -179,7 +203,7 @@ export function LiveTryOn({
 
       const ring = ringRef.current;
       if (ring?.naturalWidth) {
-        for (const place of ringPlacements) {
+        for (const place of heldRings) {
           const bandWidth = ringWidthMm * place.pxPerMm;
           const bandHeight = (bandWidth * ring.naturalHeight) / ring.naturalWidth;
           context.save();

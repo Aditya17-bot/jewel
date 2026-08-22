@@ -62,6 +62,12 @@ export function TurntableViewer({
   // decides when the stage stops saying "loading". Gate that on the first tier alone: a
   // drag sideways is what people try first, and holding readiness back for a tilted tier
   // would delay a view most visitors never ask for.
+  // Depend on what the frames ARE, not on the identity of the array holding them. A caller
+  // that builds its list inline hands over a new array every render; keyed on identity,
+  // this effect re-runs, clears `loaded`, decodes, sets `loaded` back, and re-renders the
+  // caller - a loop that pins a core and takes the tab down with it.
+  const signature = frames[0]?.join("|") ?? "";
+
   useEffect(() => {
     if (!azimuths) return undefined;
     let cancelled = false;
@@ -76,14 +82,15 @@ export function TurntableViewer({
         image.src = src;
       });
 
-    Promise.all(frames[0].map(decode)).then(() => {
+    Promise.all(signature.split("|").map(decode)).then(() => {
       if (!cancelled) setLoaded(true);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [azimuths, frames]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on contents, see above
+  }, [azimuths, signature]);
 
   const apply = useCallback(() => {
     if (!azimuths) return;

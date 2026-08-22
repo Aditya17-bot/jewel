@@ -886,6 +886,23 @@ img { display: block; max-width: 100%; }
    Not display:none - that resizes the drawing buffer to nothing and back on every toggle. */
 .stage-3d.is-stowed { opacity: 0; pointer-events: none; }
 
+/* A section that threw. Visible on the page rather than only in a console, because the
+   person who hits it is usually not the person with devtools open. */
+.section-failed { padding: 48px clamp(20px, 5vw, 64px); border-top: 1px solid var(--line); display: grid; gap: 12px; justify-items: start; }
+.section-failed h2 { margin: 0; font-size: 22px; }
+.section-failed p { margin: 0; color: var(--muted); max-width: 60ch; }
+.section-failed pre {
+  margin: 0;
+  padding: 12px 14px;
+  max-width: 100%;
+  overflow-x: auto;
+  background: #14151a;
+  color: #f2efe8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.section-failed-stack { opacity: 0.75; font-size: 11px; }
+
 /* The twin and the customer wearing it, side by side. Stacks on a phone, where a camera
    preview and a turntable both want the full width. */
 .twin-split { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); }
