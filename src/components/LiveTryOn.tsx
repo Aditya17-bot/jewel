@@ -307,6 +307,11 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
       const wrapped = ((spinRef.current % 360) + 360) % 360;
       const index = count > 1 ? Math.round((wrapped / 360) * count) % count : 0;
       const image = images[index] ?? images[0];
+      // A twin with 24 views can be *turned*: the gesture picks a different view and you
+      // see round the piece. A piece built from one photograph has nothing to turn to, so
+      // the same gesture rotates the picture in its own plane instead. Both are useful and
+      // they are not the same thing, so neither is dressed up as the other.
+      const flatSpin = count > 1 ? 0 : (wrapped * Math.PI) / 180;
 
       // The readout is the one thing here that does belong in React state, so it is
       // published on a slow clock rather than on every painted frame.
@@ -326,11 +331,14 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
         const holder = grabbing ?? heldHands[0];
         if (holder) {
           const size = holder.span * AIR_SIZE * scaleRef.current;
+          // Turn your wrist and the piece turns with it - through the twin's own views if
+          // it has them, in the plane of the picture if it has only the one.
           const turn =
             count > 1
               ? Math.round((holder.pinchAngle / (Math.PI * 2)) * count + count * 2) % count
               : 0;
-          stamp(context, images[turn] ?? image, holder.pinch.x, holder.pinch.y, size, 0);
+          const angle = count > 1 ? 0 : holder.pinchAngle;
+          stamp(context, images[turn] ?? image, holder.pinch.x, holder.pinch.y, size, angle);
         }
         return;
       }
@@ -344,7 +352,7 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
           // The band's axis runs across the finger, so the picture is turned a quarter turn
           // from the finger's own direction. Unlike an earring this does follow the limb: a
           // ring is fixed to the finger, not hanging from it.
-          stamp(context, image, hand.ring.x, hand.ring.y, size, hand.ring.angle + Math.PI / 2);
+          stamp(context, image, hand.ring.x, hand.ring.y, size, hand.ring.angle + Math.PI / 2 + flatSpin);
         }
       } else if (heldFace) {
         const size = current.frameMm * heldFace.pxPerMm * scale;
@@ -353,7 +361,7 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
           for (const ear of heldFace.ears) {
             // Drawn upright rather than rotated with the head: the ear decides where a
             // piece hangs from, gravity decides which way it then hangs.
-            stamp(context, image, ear.x, ear.y + size / 2, size, 0);
+            stamp(context, image, ear.x, ear.y + size / 2, size, flatSpin);
           }
         } else {
           // A chain, drawn rather than photographed. The twin's own chain was modelled to
@@ -374,7 +382,7 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
           context.stroke();
           context.restore();
 
-          stamp(context, image, drop.x, drop.y + size / 2, size, 0);
+          stamp(context, image, drop.x, drop.y + size / 2, size, flatSpin);
         }
       }
 
@@ -416,8 +424,8 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
         {status === "live" && tracking && (
           <p className="live-hint">
             {readout
-              ? `${Math.round(readout.scale * 100)}% size${turnable ? ` · ${String(readout.azimuth).padStart(3, "0")}°` : ""}`
-              : `Pinch thumb and finger, then drag${turnable ? " sideways to turn it and " : " "}up or down to resize.`}
+              ? `${Math.round(readout.scale * 100)}% size · ${String(readout.azimuth).padStart(3, "0")}°`
+              : `Pinch thumb and finger, then drag sideways to ${turnable ? "turn" : "rotate"} it and up or down to resize.`}
           </p>
         )}
       </div>
