@@ -31,13 +31,41 @@ const H = {
   pinkyMcp: 17,
 };
 
-// The hand's equivalent of interpupillary distance. Mean adult breadth across the
-// metacarpals - the steadiest width on a hand, and it does not change as fingers curl.
-// A population average, not a measurement, the same caveat the IPD carries.
+// Two independent ways to turn pixels into millimetres, because one is not enough.
+//
+// The knuckle span is the classic choice - the steadiest width on a hand, unchanged as
+// fingers curl. But it foreshortens the moment the hand tilts away from the lens, and a
+// hand held up to a webcam is almost never flat to it.
+//
+// The ring finger's proximal phalanx is the segment the ring actually sits on, so it is
+// the right length to measure at exactly the place the answer is used - but it collapses
+// when the finger points at the camera.
+//
+// Both errors run the same way: foreshortening only ever makes a length look SHORTER, so
+// each estimate can be too small and neither can be too big. The larger of the two is
+// therefore the better one, and taking the max is not a fudge - it is the only combination
+// that is right when either measurement is compromised. Undersizing was what made a band
+// read as floating beside a finger rather than sitting round it.
 const KNUCKLE_SPAN_MM = 82;
+const RING_PHALANX_MM = 42;
+// And a third, which turned out to be the one that matters. Adjacent metacarpal heads sit
+// about one finger-width apart, so the gap between the middle, ring and little knuckles
+// measures the ring finger's own width - at the exact place the ring goes, and along the
+// same axis the band is drawn on. Both of the others measure a length that runs INTO the
+// picture and shrink as the hand tilts; this one runs ACROSS it, so it is projected by the
+// same factor as the thing being drawn and cannot disagree with it. A hand held up close
+// and tilted, which is every webcam photograph of a hand, put the other two out by about
+// a third - and a band a third narrow is exactly what "it just floats near the hand" is.
+const FINGER_WIDTH_MM = 19;
 
-/** A third of the way along the proximal phalanx: where a band rests, not on the knuckle. */
-const ALONG_PHALANX = 0.34;
+/** How far up the proximal phalanx the band sits.
+ *
+ * Nearer the middle than a real ring, deliberately. MediaPipe's MCP landmark sits on the
+ * knuckle LINE, which on a splayed hand is medial to the finger's own axis a centimetre
+ * further up - so a band placed right at the knuckle is pulled toward the neighbouring
+ * finger and hangs into the gap between them. Sliding up the phalanx puts it where the two
+ * landmarks bracket the finger evenly. */
+const ALONG_PHALANX = 0.42;
 
 let landmarkerPromise: Promise<HandLandmarker> | null = null;
 
@@ -67,6 +95,10 @@ export interface HandReadout {
   ring: { x: number; y: number; angle: number; pxPerMm: number };
   /** Knuckle span in pixels - the hand's own scale, before it is turned into millimetres. */
   span: number;
+  /** Ring-finger proximal phalanx in pixels: the second scale, measured where it is used. */
+  phalanx: number;
+  /** Mean gap between neighbouring knuckles: the ring finger's own width, in pixels. */
+  fingerWidth: number;
   /** Which hand the model thinks it is. Cosmetic; nothing is placed from it. */
   side: string;
 }
@@ -104,6 +136,11 @@ export async function analyseHandPhoto(file: File): Promise<HandReadout> {
     return { at, span: Math.hypot(pinky.x - index.x, pinky.y - index.y) };
   };
 
+  // Diagnostic hook. Placing a ring on a hand is the one thing here that cannot be
+  // checked by reading the code, and a screenshot of a misplaced ring does not say which
+  // landmark moved. Costs one assignment per photograph.
+  (globalThis as Record<string, unknown>).__lastHandLandmarks = hands;
+
   let best = -1;
   let bestIndex = 0;
   let chosen = measure(hands[0]);
@@ -119,6 +156,13 @@ export async function analyseHandPhoto(file: File): Promise<HandReadout> {
 
   const mcp = chosen.at(H.ringMcp);
   const pip = chosen.at(H.ringPip);
+  const phalanx = Math.hypot(pip.x - mcp.x, pip.y - mcp.y);
+
+  const middle = chosen.at(H.middleMcp);
+  const pinky = chosen.at(H.pinkyMcp);
+  const fingerWidth =
+    (Math.hypot(mcp.x - middle.x, mcp.y - middle.y) +
+      Math.hypot(pinky.x - mcp.x, pinky.y - mcp.y)) / 2;
 
   return {
     canvas,
@@ -126,9 +170,18 @@ export async function analyseHandPhoto(file: File): Promise<HandReadout> {
       x: mcp.x + (pip.x - mcp.x) * ALONG_PHALANX,
       y: mcp.y + (pip.y - mcp.y) * ALONG_PHALANX,
       angle: Math.atan2(pip.y - mcp.y, pip.x - mcp.x),
-      pxPerMm: chosen.span / KNUCKLE_SPAN_MM,
+      // Every one of these under-reads when foreshortened and none can over-read, so the
+      // largest is the best estimate. Not a fudge - the only combination that stays right
+      // when any one of the three is compromised.
+      pxPerMm: Math.max(
+        chosen.span / KNUCKLE_SPAN_MM,
+        phalanx / RING_PHALANX_MM,
+        fingerWidth / FINGER_WIDTH_MM,
+      ),
     },
     span: chosen.span,
+    phalanx,
+    fingerWidth,
     side: result.handedness?.[bestIndex]?.[0]?.categoryName ?? 'Hand',
   };
 }
@@ -229,26 +282,75 @@ export function composeHandTryOn(
     return out;
   }
 
-  const across = (BAND_ACROSS_MM / 2) * scale * pxPerMm;
+  // A ring is never narrower than the finger inside it, so the finger's measured width is
+  // a floor on the band, not just an input to the scale. Every scale estimate a landmarker
+  // can give is an under-estimate under foreshortening, and a band drawn narrower than the
+  // finger it is on does not read as a ring at any quality of shading - it reads as a bead
+  // resting beside one, which is exactly what "it just floats near the hand" describes.
+  const across = Math.max(
+    (BAND_ACROSS_MM / 2) * scale * pxPerMm,
+    (hand.fingerWidth / 2) * 1.06 * scale,
+  );
   const along = (BAND_ALONG_MM / 2) * scale * pxPerMm;
   const tone = FLAT_METALS[metal];
 
+  // A band goes ROUND a finger, so three things have to be drawn, not one:
+  //
+  //   the far rim, a sliver showing above the finger where the ring passes behind it,
+  //   the shadow the band throws down the finger below itself,
+  //   the near face, which is the only part a flat lozenge was ever drawing.
+  //
+  // The first two are what a photograph of a real ring has and a sticker does not, and
+  // their absence is most of why the old one read as floating beside the finger.
+  const rim = along * 0.42;
+
   ctx.save();
-  ctx.shadowColor = `rgba(20,16,10,${preset.shadow})`;
-  ctx.shadowBlur = across * 0.5;
-  ctx.shadowOffsetY = along * 0.9;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.ellipse(0, -along * 0.9, across * 0.94, rim, 0, Math.PI, Math.PI * 2);
+  ctx.fillStyle = tone.dark;
+  ctx.fill();
+  ctx.restore();
+
+  // Contact shadow on the skin just below the band. Drawn as its own shape rather than as
+  // a canvas shadow so it follows the finger rather than the light.
+  ctx.save();
+  ctx.globalAlpha = preset.shadow * 1.4;
+  ctx.beginPath();
+  ctx.ellipse(0, along * 0.85, across * 0.9, along * 0.7, 0, 0, Math.PI * 2);
+  ctx.filter = `blur(${Math.max(1, along * 0.5)}px)`;
+  ctx.fillStyle = 'rgba(38,24,12,1)';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
   ctx.beginPath();
   ctx.ellipse(0, 0, across, along, 0, 0, Math.PI * 2);
   ctx.fillStyle = bandGradient(ctx, tone, across);
   ctx.fill();
   ctx.restore();
 
-  // The specular streak, offset toward the light rather than centred - a highlight down
-  // the middle of a cylinder is what a flat fill looks like when you add one line to it.
+  // The two ends curve away round the sides of the finger, so they lose the light before
+  // the middle does. Without this the band is a flat strip laid on top of the skin.
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-atop';
+  const ends = ctx.createLinearGradient(-across, 0, across, 0);
+  ends.addColorStop(0, 'rgba(0,0,0,0.55)');
+  ends.addColorStop(0.18, 'rgba(0,0,0,0)');
+  ends.addColorStop(0.82, 'rgba(0,0,0,0)');
+  ends.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.beginPath();
+  ctx.ellipse(0, 0, across, along, 0, 0, Math.PI * 2);
+  ctx.fillStyle = ends;
+  ctx.fill();
+  ctx.restore();
+
+  // The specular streak, above centre rather than through it - a highlight down the middle
+  // of a cylinder is what a flat fill looks like when you add one line to it.
   ctx.save();
   ctx.globalAlpha = Math.min(0.9, 0.55 * preset.shine);
   ctx.beginPath();
-  ctx.ellipse(0, -along * 0.3, across * 0.72, along * 0.26, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -along * 0.34, across * 0.66, along * 0.24, 0, 0, Math.PI * 2);
   ctx.fillStyle = tone.light;
   ctx.fill();
   ctx.restore();
@@ -266,19 +368,19 @@ export function composeHandTryOn(
 
     // Claws first, so the stone sits in them rather than on them.
     ctx.beginPath();
-    ctx.ellipse(0, 0, radius * 1.16, radius * 0.86, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -along * 0.2, radius * 1.16, radius * 0.9, 0, 0, Math.PI * 2);
     ctx.fillStyle = bandGradient(ctx, tone, radius * 1.16);
     ctx.fill();
 
     ctx.beginPath();
-    ctx.ellipse(0, 0, radius, radius * 0.72, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -along * 0.2, radius, radius * 0.76, 0, 0, Math.PI * 2);
     ctx.fillStyle = facets;
     ctx.fill();
 
     ctx.save();
     ctx.globalAlpha = Math.min(1, 0.8 * preset.shine);
     ctx.beginPath();
-    ctx.ellipse(-radius * 0.28, -radius * 0.2, radius * 0.24, radius * 0.16, 0, 0, Math.PI * 2);
+    ctx.ellipse(-radius * 0.28, -along * 0.2 - radius * 0.2, radius * 0.24, radius * 0.16, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     ctx.restore();

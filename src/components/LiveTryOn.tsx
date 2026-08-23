@@ -46,6 +46,19 @@ type Status = "idle" | "starting" | "live" | "error";
 type Mode = "worn" | "air";
 
 /**
+ * Whether a piece can be worn live at all.
+ *
+ * Ears and a neck can. A finger cannot, and pretending otherwise was worse than not
+ * offering it: MediaPipe gives 21 hand landmarks with no wrist roll and no finger
+ * thickness, so a band drawn on a moving hand reads as a sticker floating beside it
+ * rather than as something round the finger. The still-photograph path in the section
+ * below has a frame to work with and does it properly.
+ *
+ * A ring can still be HELD - "In my hand" is honest about the piece sitting in the air.
+ */
+const WEARABLE_LIVE: Record<WornOn, boolean> = { ears: true, neck: true, finger: false };
+
+/**
  * How often the models actually run, in milliseconds. About 24 detections a second, well
  * under the display's rate: inference is the expensive part of this loop by a wide margin,
  * and on a thin laptop running it every painted frame is enough to make the whole machine
@@ -144,7 +157,14 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState(false);
-  const [mode, setMode] = useState<Mode>("worn");
+  // A ring opens in the one mode that is true for it.
+  const [mode, setMode] = useState<Mode>(() => (WEARABLE_LIVE[piece.wornOn] ? "worn" : "air"));
+  const canWear = WEARABLE_LIVE[piece.wornOn];
+
+  // The piece can change under a live camera without the component remounting.
+  useEffect(() => {
+    if (!WEARABLE_LIVE[piece.wornOn]) setMode("air");
+  }, [piece.wornOn]);
   const [readout, setReadout] = useState<{ scale: number; azimuth: number } | null>(null);
 
   // The models, and whether a load is already in flight for each.
@@ -400,13 +420,9 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
       const scale = scaleRef.current;
 
       if (current.wornOn === "finger") {
-        for (const hand of heldHands) {
-          const size = current.frameMm * hand.ring.pxPerMm * scale;
-          // The band's axis runs across the finger, so the picture is turned a quarter turn
-          // from the finger's own direction. Unlike an earring this does follow the limb: a
-          // ring is fixed to the finger, not hanging from it.
-          stamp(context, image, hand.ring.x, hand.ring.y, size, hand.ring.angle + Math.PI / 2 + flatSpin);
-        }
+        // Nothing. A ring is never drawn on a live finger - see WEARABLE_LIVE. The mode
+        // toggle keeps a ring in "air", so this branch is only reachable for the frame or
+        // two while a new piece is settling in.
       } else if (heldFace) {
         const size = current.frameMm * heldFace.pxPerMm * scale;
 
@@ -470,7 +486,7 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
         {status === "live" && !tracking && (
           <p className="live-hint">
             {piece.wornOn === "finger"
-              ? "Looking for a hand — hold one up, palm towards the camera."
+              ? "Hold a hand up, palm towards the camera, and pinch to take hold of it."
               : "Looking for you — face the camera and make sure the light is on you."}
           </p>
         )}
@@ -493,23 +509,37 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
             {status === "starting" ? "Starting…" : "Try it on with my camera"}
           </button>
         )}
-        <div className="live-modes" role="group" aria-label="Where the piece goes">
-          <button
-            type="button"
-            className={mode === "worn" ? "is-selected" : undefined}
-            onClick={() => setMode("worn")}
-          >
-            On me
-          </button>
-          <button
-            type="button"
-            className={mode === "air" ? "is-selected" : undefined}
-            onClick={() => setMode("air")}
-          >
-            In my hand
-          </button>
-        </div>
-        <span className="live-piece">{piece.label}</span>
+        {/* A ring gets no "On me". The live camera cannot put a band round a moving
+            finger convincingly and the honest thing is to not offer it, rather than to
+            offer it and have it float. */}
+        {canWear && (
+          <div className="live-modes" role="group" aria-label="Where the piece goes">
+            <button
+              type="button"
+              className={mode === "worn" ? "is-selected" : undefined}
+              onClick={() => setMode("worn")}
+            >
+              On me
+            </button>
+            <button
+              type="button"
+              className={mode === "air" ? "is-selected" : undefined}
+              onClick={() => setMode("air")}
+            >
+              In my hand
+            </button>
+          </div>
+        )}
+        <span className="live-piece">
+          {canWear ? piece.label : `${piece.label} · held, not worn`}
+        </span>
+        {!canWear && (
+          <p className="live-aside">
+            A ring is held in your hand here, not worn on it — a live camera gives no wrist
+            roll and no finger thickness, so a band drawn on a moving finger floats. To see
+            one on a finger, use a photograph in the section below.
+          </p>
+        )}
       </div>
     </div>
   );

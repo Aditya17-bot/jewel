@@ -792,6 +792,78 @@ img { display: block; max-width: 100%; }
 
 .try-on-upload:hover { border-color: var(--forest-soft); background: var(--paper); }
 
+/* The width slider. It was a raw `input[type=range]`, which Chrome paints in its own
+   bright blue - the single loudest off-brand element on a page otherwise built out of
+   hairlines and ivory. Both vendor tracks have to be written out; there is no shorthand
+   that covers WebKit and Gecko together. */
+.size-label {
+  margin: 14px 0 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: #737873;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.size-label b {
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+.size-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.size-slider::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--line-dark);
+}
+.size-slider::-moz-range-track {
+  height: 1px;
+  background: var(--line-dark);
+}
+.size-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin-top: -7px;
+  border: 1px solid var(--gold-dark);
+  border-radius: 50%;
+  background: var(--paper);
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+.size-slider::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--gold-dark);
+  border-radius: 50%;
+  background: var(--paper);
+}
+.size-slider:hover::-webkit-slider-thumb { background: #fff; box-shadow: 0 0 0 5px rgba(157, 122, 45, 0.12); }
+.size-slider:focus-visible { outline: none; }
+.size-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 5px rgba(157, 122, 45, 0.3); }
+.size-slider:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 5px rgba(157, 122, 45, 0.3); }
+
+/* A sentence the camera adds when a piece cannot honestly be worn live. */
+.live-aside {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
 .hand-snap { display: block; }
 .hand-snap-live {
   margin-top: 10px;

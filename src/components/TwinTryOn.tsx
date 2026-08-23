@@ -21,10 +21,10 @@ import { LiveTryOn, type WornOn } from "./LiveTryOn";
 import { TurntableViewer } from "./TurntableViewer";
 
 const CUSTOM_ID = "YOURS";
-const WHERE: { id: WornOn; label: string }[] = [
-  { id: "finger", label: "On a finger" },
-  { id: "ears", label: "On the ears" },
-  { id: "neck", label: "At the neck" },
+const WHERE: { id: WornOn; label: string; worn: string }[] = [
+  { id: "finger", label: "On a finger", worn: "ring finger" },
+  { id: "ears", label: "On the ears", worn: "both ears" },
+  { id: "neck", label: "At the neck", worn: "at the collarbone" },
 ];
 
 /** A photographed piece, dressed as a catalogue entry so nothing downstream special-cases it. */
@@ -103,12 +103,42 @@ export function TwinTryOn() {
   const frames = useMemo(() => piece.frames(metal, stone), [piece, metal, stone]);
   const cutout = piece.cutout(metal, stone);
 
-  // The camera is handed one piece and the piece says where it goes, so a ring is never
-  // drawn on an earlobe and a pendant no longer has nowhere to go.
-  const worn = useMemo(() => piece.worn(metal, stone), [piece, metal, stone]);
+  // Where a piece goes and how big it is used to be answerable only for an uploaded
+  // photograph, and the catalogue's own pieces were fixed at whatever they were published
+  // as. Both are now adjustable for everything: a customer wanting to see the pendant as
+  // a ring, or the studs at the size they actually own, was being told no for no reason.
+  //
+  // The piece's own values are the starting point, so nothing changes until it is touched.
+  const [placed, setPlaced] = useState<WornOn | null>(null);
+  const [sizeMm, setSizeMm] = useState<number | null>(null);
+  useEffect(() => {
+    setPlaced(null);
+    setSizeMm(null);
+  }, [piece.id]);
+
+  const worn = useMemo(() => {
+    const base = piece.worn(metal, stone);
+    const where = placed ?? base.wornOn;
+    if (sizeMm === null && where === base.wornOn) return base;
+    // frameMm is what the whole square is worth, and the piece inside it is a fixed
+    // fraction of that square - so a new real width scales the square by the same ratio
+    // rather than being assigned to it. Assigning it directly is the mistake that made a
+    // 19 mm ring come out a third too small.
+    const width = sizeMm ?? piece.widthMm;
+    return {
+      ...base,
+      wornOn: where,
+      frameMm: base.frameMm * (width / piece.widthMm),
+      label: `${piece.id} · ${WHERE.find((entry) => entry.id === where)?.worn ?? where}`,
+    };
+  }, [piece, metal, stone, placed, sizeMm]);
+
+  const widthMm = sizeMm ?? piece.widthMm;
+  const wornOn = placed ?? piece.wornOn;
   const turns = worn.frames.length > 1;
   const isCustom = piece.id === CUSTOM_ID;
-  const step = (n: number) => n + (variable ? 1 : 0);
+  // Metal and stone only appear for a rendered piece, so the steps after it shuffle up.
+  const step = (n: number) => (variable ? n : n - 1);
 
   return (
     <section className="digital-twin-workspace twin-workspace" id="try-on">
@@ -195,45 +225,51 @@ export function TwinTryOn() {
           {note && <p className="size-spec">{note}</p>}
         </div>
 
-        {isCustom && (
-          <div className="config-section">
-            <span className="config-label"><b>2.</b> Where it goes, and how big</span>
-            <div className="tryon-grid" role="group" aria-label="Where the piece is worn">
-              {WHERE.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={option.id === photo?.wornOn ? "size-option is-selected" : "size-option"}
-                  onClick={() => setPhoto((current) => (current ? relocated(current, option.id) : current))}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <label className="size-spec" htmlFor="custom-width">
-              How wide the piece really is: <b>{photo?.widthMm}&nbsp;mm</b>
-            </label>
-            <input
-              id="custom-width"
-              type="range"
-              min={5}
-              max={60}
-              step={1}
-              value={photo?.widthMm ?? 20}
-              onChange={(event) =>
-                setPhoto((current) => (current ? resized(current, Number(event.target.value)) : current))
-              }
-            />
-            <p className="size-spec">
-              A photograph carries no scale at all — the same picture could be a signet ring or
-              a bangle — so this is the one thing that has to be told rather than measured.
-            </p>
+        <div className="config-section">
+          <span className="config-label"><b>2.</b> Where it goes, and how big</span>
+          <div className="tryon-grid" role="group" aria-label="Where the piece is worn">
+            {WHERE.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={option.id === wornOn ? "size-option is-selected" : "size-option"}
+                onClick={() => {
+                  setPlaced(option.id);
+                  if (isCustom) setPhoto((current) => (current ? relocated(current, option.id) : current));
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
-        )}
+          <label className="size-label" htmlFor="piece-width">
+            <span>How wide the piece really is</span>
+            <b>{isCustom ? photo?.widthMm ?? widthMm : widthMm}&nbsp;mm</b>
+          </label>
+          <input
+            id="piece-width"
+            className="size-slider"
+            type="range"
+            min={5}
+            max={60}
+            step={1}
+            value={isCustom ? photo?.widthMm ?? widthMm : widthMm}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              setSizeMm(next);
+              if (isCustom) setPhoto((current) => (current ? resized(current, next) : current));
+            }}
+          />
+          <p className="size-spec">
+            {isCustom
+              ? "A photograph carries no scale at all — the same picture could be a signet ring or a bangle — so this is the one thing that has to be told rather than measured."
+              : `Published at ${piece.widthMm} mm. Move it to see the piece at the size you actually wear, or to try it somewhere it was not published for.`}
+          </p>
+        </div>
 
         {variable && (
           <div className="config-section">
-            <span className="config-label"><b>2.</b> Metal and stone</span>
+            <span className="config-label"><b>3.</b> Metal and stone</span>
             <div className="tryon-grid" role="group" aria-label="Metal">
               {materialOptions.map((option) => (
                 <button
@@ -262,7 +298,7 @@ export function TwinTryOn() {
         )}
 
         <div className="config-section">
-          <span className="config-label"><b>{step(isCustom ? 3 : 2)}.</b> Try it on</span>
+          <span className="config-label"><b>{step(3)}.</b> Try it on</span>
           <p className="size-spec">
             {piece.wornOn === "ears"
               ? "Start the camera and the piece lands on both ears."
@@ -278,7 +314,7 @@ export function TwinTryOn() {
         </div>
 
         <div className="config-section">
-          <span className="config-label"><b>{step(isCustom ? 4 : 3)}.</b> How it is sized</span>
+          <span className="config-label"><b>{step(4)}.</b> How it is sized</span>
           <p className="size-spec">
             {piece.wornOn === "finger"
               ? "The span across your knuckles is the steadiest width on a hand, so a"
