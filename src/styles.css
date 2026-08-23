@@ -423,6 +423,27 @@ img { display: block; max-width: 100%; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .viewer-error strong { color: var(--ink); font-size: 14px; }
 .viewer-error span { text-transform: none; letter-spacing: 0; }
+/* The stage before a hand has been given to it. Same shape as the error state, without
+   the alarm: nothing has gone wrong, there is simply no photograph yet. */
+.viewer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 32px;
+  max-width: 42ch;
+  margin: 0 auto;
+  text-align: center;
+  color: #60655f;
+  font-size: 12px;
+}
+.viewer-empty strong {
+  color: var(--ink);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
 .viewer-footnote {
   position: absolute;
   z-index: 4;
@@ -841,6 +862,31 @@ img { display: block; max-width: 100%; }
   gap: 8px;
   font-size: 11px;
 }
+
+.hand-snap { display: block; }
+.hand-snap-live {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.hand-snap-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  /* The preview is mirrored, and so is the captured frame - see HandSnap. Looking at an
+     unmirrored feed of your own hand and trying to line it up is genuinely difficult. */
+  transform: scaleX(-1);
+  background: #11130f;
+}
+.hand-snap-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.hand-snap-actions .button { flex: 1; height: 36px; font-size: 11px; }
+.hand-snap-actions .button-outline { flex: 0 0 44px; }
 
 .try-on-error {
   margin: 12px 0 0;

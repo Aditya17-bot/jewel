@@ -11,6 +11,15 @@ export interface TryOnModel {
   label: string;
   note: string;
   photo: string | null;
+  /**
+   * Which part of a person the photograph is of, and therefore which model reads it.
+   *
+   * A face and a hand are two different landmarkers, two different sets of anchors and
+   * two different renderers. Saying so on the subject is what stops a ring being placed
+   * on an earlobe, which is exactly what happened while every subject was assumed to be
+   * a face.
+   */
+  subject: 'face' | 'hand';
 }
 
 export const TRY_ON_MODELS: TryOnModel[] = [
@@ -19,18 +28,33 @@ export const TRY_ON_MODELS: TryOnModel[] = [
     label: 'Aarav',
     note: 'Turned three-quarters. Good for a single earring and for judging a profile.',
     photo: '/models/aarav.png',
+    subject: 'face',
   },
   {
     id: 'mira',
     label: 'Mira',
     note: 'Bare neck and collarbone, hair up. The one to use for pendants and chains.',
     photo: '/models/mira.png',
+    subject: 'face',
   },
   {
     id: 'yours',
     label: 'Your own face',
     note: 'Add a photo or take a selfie. It is read in this tab and never uploaded.',
     photo: null,
+    subject: 'face',
+  },
+  {
+    id: 'hand',
+    label: 'A hand',
+    note:
+      'Add a photo of a hand, or snap one from the camera. Rings go on the ring finger, ' +
+      'sized from the span across the knuckles. Nothing is uploaded.',
+    // Deliberately not a stock photograph. Aarav and Mira are portraits, and there is no
+    // hand photo this project has the right to ship - so the hand is always the person's
+    // own, either from a file or grabbed from the live camera.
+    photo: null,
+    subject: 'hand',
   },
 ];
 

@@ -13,6 +13,8 @@ import { cutOutPiece, readPieceFromPhoto } from "../tryon/fromphoto";
 import { composeTryOn } from "../tryon/compose";
 import { placeOnFace } from "../tryon/place";
 import { TRY_ON_MODELS, loadModelPhoto } from "../tryon/models";
+import { analyseHandPhoto, composeHandTryOn, preloadHandMesh, type HandReadout } from "../tryon/handphoto";
+import { HandSnap } from "./HandSnap";
 
 type Face = Awaited<ReturnType<typeof analysePhoto>>;
 
@@ -186,6 +188,44 @@ function FlatStage({
   return <div className="flat-stage" ref={holder} />;
 }
 
+/** The same try-on, on a hand. Ring finger, sized from the span across the knuckles. */
+function HandStage({
+  hand,
+  piece,
+  metal,
+  stone,
+  light,
+  cutout,
+}: {
+  hand: HandReadout;
+  piece: string;
+  metal: string;
+  stone: string;
+  light: string;
+  cutout: HTMLCanvasElement | null;
+}) {
+  const holder = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const host = holder.current;
+    if (!host) return;
+    const drawn = composeHandTryOn(hand, {
+      piece: cutout && piece === "yours" ? "cutout" : "band",
+      metal: metal as never,
+      stone: stone as never,
+      light: light as never,
+      // A plain band has no stone to change, and drawing one anyway made the metal
+      // swatches look broken - every choice put the same solitaire on the finger.
+      stoneSet: piece !== "band",
+      cutout,
+    });
+    drawn.className = "flat-canvas";
+    host.replaceChildren(drawn);
+  }, [hand, piece, metal, stone, light, cutout]);
+
+  return <div className="flat-stage" ref={holder} />;
+}
+
 export function TryOnStudio() {
   const [wearer, setWearer] = useState("mira");
   const [jewel, setJewel] = useState("hoop");
@@ -194,6 +234,7 @@ export function TryOnStudio() {
   const [light, setLight] = useState("daylight");
 
   const [face, setFace] = useState<Face | null>(null);
+  const [hand, setHand] = useState<HandReadout | null>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [pieceNote, setPieceNote] = useState("");
@@ -225,6 +266,7 @@ export function TryOnStudio() {
   const [mount3D, setMount3D] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const handInputRef = useRef<HTMLInputElement>(null);
   const pieceInputRef = useRef<HTMLInputElement>(null);
   // Photos can be swapped faster than FaceMesh can finish. Only the newest result counts.
   const analysisRef = useRef(0);
@@ -257,9 +299,17 @@ export function TryOnStudio() {
     return () => observer.disconnect();
   }, []);
 
+  const activeModel = TRY_ON_MODELS.find((entry) => entry.id === wearer);
+  const subject = activeModel?.subject ?? "face";
+
+  // Two models, ~15 MB and ~7.5 MB, and only one of them is ever needed at a time. The
+  // download starts when the section comes within reach of the viewport, for whichever
+  // part of a person is being worn on.
   useEffect(() => {
-    if (inReach && vision) preloadFaceMesh();
-  }, [inReach, vision]);
+    if (!inReach || !vision) return;
+    if (subject === "hand") preloadHandMesh();
+    else preloadFaceMesh();
+  }, [inReach, vision, subject]);
 
   const track = useCallback(async (file: File, label: string) => {
     const token = (analysisRef.current += 1);
@@ -294,6 +344,37 @@ export function TryOnStudio() {
     }
   }, []);
 
+  const trackHand = useCallback(async (file: File, label: string) => {
+    const token = (analysisRef.current += 1);
+    setError("");
+    setStatus("Finding the hand…");
+    setPreviewUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return URL.createObjectURL(file);
+    });
+
+    try {
+      const found = await analyseHandPhoto(file);
+      if (token !== analysisRef.current) return; // a newer photo was chosen
+      setHand(found);
+      setStatus(
+        `${label} · 21 landmarks, sized from the ${Math.round(found.span)} px across the knuckles.`,
+      );
+    } catch (cause) {
+      if (token !== analysisRef.current) return;
+      setStatus("");
+      setHand(null);
+      const reason = (cause as Error)?.message;
+      setError(
+        reason === "no-hand"
+          ? "No hand found in that photograph. An open hand, palm or back toward the camera, filling a good part of the frame works best."
+          : reason === "no-webgl"
+            ? NO_VISION_MESSAGE
+            : `Hand tracking could not start: ${reason ?? cause}`,
+      );
+    }
+  }, []);
+
   // Whichever model is chosen goes through the same tracker your own photo does.
   useEffect(() => {
     if (!inReach || !vision) return undefined;
@@ -312,9 +393,9 @@ export function TryOnStudio() {
 
   const piece = useMemo(() => {
     void catalogue;
-    if (!face) return null;
+    if (!face || subject === "hand") return null;
     return placeOnFace(jewel, metal, face, undefined, stone);
-  }, [face, jewel, metal, stone, catalogue]);
+  }, [face, jewel, metal, stone, catalogue, subject]);
 
   const selectPhoto = (file: File | undefined) => {
     if (!file) return;
@@ -332,6 +413,24 @@ export function TryOnStudio() {
     }
     setWearer("yours");
     void track(file, "Your photograph");
+  };
+
+  const selectHandPhoto = (file: File | undefined) => {
+    if (!file) return;
+    if (!vision) {
+      setError(NO_VISION_MESSAGE);
+      return;
+    }
+    if (!ACCEPTED.includes(file.type)) {
+      setError(`That file is a ${file.type || "unknown type"}. Use a JPEG, PNG or WebP image.`);
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError(`That image is ${(file.size / 1024 / 1024).toFixed(1)} MB. The limit is 20 MB.`);
+      return;
+    }
+    setWearer("hand");
+    void trackHand(file, "Your hand");
   };
 
   /**
@@ -357,7 +456,7 @@ export function TryOnStudio() {
 
       JEWELS.yours = {
         label: "Your photo",
-        anchor: isBand ? "ear" : "neck",
+        anchor: isBand ? "finger" : "neck",
         hang: isBand ? measured.radius : 0,
         bail: isBand ? 0 : measured.height / 2 + 0.0025,
         build: (metalId: string) => createMeasuredPiece(measured, metalId),
@@ -385,12 +484,20 @@ export function TryOnStudio() {
     }
   };
 
+  // A hand wears rings and a face wears everything else, so the list is what the subject
+  // can actually take. Offering a pendant on a hand was not a harmless extra option: it
+  // was chosen, nothing changed on screen, and the section read as broken.
   const pieces = useMemo(() => {
     void catalogue;
-    return Object.entries(JEWELS) as Array<[string, { label: string }]>;
-  }, [catalogue]);
+    const all = Object.entries(JEWELS) as Array<[string, { label: string; anchor: string }]>;
+    return all.filter(([, spec]) => (subject === "hand") === (spec.anchor === "finger"));
+  }, [catalogue, subject]);
 
-  const activeModel = TRY_ON_MODELS.find((entry) => entry.id === wearer);
+  // Switching subject with a piece selected that the new one cannot wear leaves the stage
+  // showing nothing at all, which looks like a crash rather than a choice.
+  useEffect(() => {
+    if (pieces.length && !pieces.some(([id]) => id === jewel)) setJewel(pieces[0][0]);
+  }, [pieces, jewel]);
 
   return (
     <section className="digital-twin-workspace" id="try-on-photo" ref={sectionRef}>
@@ -402,9 +509,23 @@ export function TryOnStudio() {
               <span>{NO_VISION_MESSAGE}</span>
             </div>
           )}
-          {vision && !face && !error && <div className="viewer-loading"><span /> Reading the photograph…</div>}
-          {face && (
+          {vision && subject === "face" && !face && !error && (
+            <div className="viewer-loading"><span /> Reading the photograph…</div>
+          )}
+          {vision && subject === "hand" && !hand && !error && (
+            <div className="viewer-empty">
+              <strong>No hand yet</strong>
+              <span>
+                Add a photo of a hand, or snap one from the camera. There is no stock hand
+                photograph here on purpose — it is always yours.
+              </span>
+            </div>
+          )}
+          {subject === "face" && face && (
             <FlatStage face={face} piece={jewel} metal={metal} stone={stone} light={light} cutout={cutout} />
+          )}
+          {subject === "hand" && hand && (
+            <HandStage hand={hand} piece={jewel} metal={metal} stone={stone} light={light} cutout={cutout} />
           )}
           <div className="live-3d-badge"><span /> Worn live · your device only</div>
 
@@ -433,7 +554,11 @@ export function TryOnStudio() {
           <div>
             <span className="product-id">Worn</span>
             <h2>{activeModel?.label ?? "Try it on"}</h2>
-            <p>468 landmarks&nbsp;&nbsp;·&nbsp;&nbsp;sized in real millimetres</p>
+            <p>
+              {subject === "hand"
+                ? "21 landmarks  ·  sized across the knuckles"
+                : "468 landmarks  ·  sized from the spacing of the eyes"}
+            </p>
           </div>
           <div className="protected-product">
             <LockSimple size={28} weight="regular" />
@@ -449,7 +574,10 @@ export function TryOnStudio() {
                 key={model.id}
                 className={wearer === model.id ? "size-option is-selected" : "size-option"}
                 onClick={() => {
-                  if (model.photo) setWearer(model.id);
+                  // A hand shows its own two ways in below rather than jumping straight
+                  // to a file dialog: one of them is the camera, and a picker cannot
+                  // offer that.
+                  if (model.photo || model.subject === "hand") setWearer(model.id);
                   else fileInputRef.current?.click();
                 }}
               >
@@ -468,7 +596,29 @@ export function TryOnStudio() {
               event.target.value = "";
             }}
           />
-          {previewUrl && wearer === "yours" && (
+          {subject === "hand" && (
+            <>
+              <button
+                type="button"
+                className="button button-outline try-on-upload"
+                onClick={() => handInputRef.current?.click()}
+              >
+                <UploadSimple size={17} /> Add a photo of a hand
+              </button>
+              <HandSnap onCapture={(file) => selectHandPhoto(file)} />
+              <input
+                ref={handInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                onChange={(event) => {
+                  selectHandPhoto(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </>
+          )}
+          {previewUrl && (wearer === "yours" || wearer === "hand") && (
             <img className="try-on-thumb" src={previewUrl} alt="The photograph you are trying pieces on" />
           )}
         </div>

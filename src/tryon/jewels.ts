@@ -186,7 +186,9 @@ export const JEWELS = {
   // `hang` is how far the piece's origin sits below the point it is attached to: a hoop
   // pivots on the piercing and swings its whole radius below it, a stud does not move.
   hoop: { label: 'Hoop earring', anchor: 'ear', hang: HOOP_RADIUS, build: hoop },
-  band: { label: 'Ring / band', anchor: 'ear', hang: RING_RADIUS, build: band },
+  // Anchored to a finger, which is not a thing a face has. Until the photo section could
+  // read a hand this said 'ear', and a ring was drawn hanging off an earlobe.
+  band: { label: 'Ring / band', anchor: 'finger', hang: RING_RADIUS, build: band },
   stud: { label: 'Stud earring', anchor: 'ear', hang: 0, build: stud },
   pendant: { label: 'Pendant', anchor: 'neck', hang: 0, bail: PENDANT_BAIL_HEIGHT, build: pendant },
 };

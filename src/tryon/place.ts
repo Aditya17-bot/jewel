@@ -130,6 +130,11 @@ export function placeOnFace(jewelId, metalId, face, adjust = NO_ADJUST, stoneId)
   // same visible amount whichever subject it is being worn on.
   const reach = face.headWidth;
 
+  // A face has no finger. A ring on a photographed hand is drawn by handphoto.ts, which
+  // has its own landmarks and its own renderer; there is nothing for this function to
+  // hang it from, and returning an empty group is more honest than putting it on an ear.
+  if (spec.anchor === 'finger') return group;
+
   if (spec.anchor === 'ear') {
     const pieces = face.anchors.ears.map((anchor, index) => {
       const side = index === 0 ? -1 : 1; // ears[0] is the -right side of the head
