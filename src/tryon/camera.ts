@@ -118,6 +118,16 @@ export interface HandReading {
   palm: { x: number; y: number };
   /** Knuckle span in pixels, the hand's own scale. */
   span: number;
+  /**
+   * Which hand the model thinks this is, "Left" or "Right".
+   *
+   * Needed because the order of the returned list is NOT stable: with two hands in frame
+   * the model can swap them between detections, and anything that identifies a hand by its
+   * position in the array is then tracking a different hand from one frame to the next.
+   * For a gesture measured as a CHANGE in position that is fatal - the swap reads as the
+   * hand having teleported across the picture.
+   */
+  side: string;
 }
 
 /**
@@ -146,6 +156,9 @@ export function readHands(
 
   const result = landmarker.detectForVideo(video, timestampMs);
   const hands = result.landmarks ?? [];
+  // The preview is mirrored, so the model's "Left" is the hand on the viewer's right.
+  // Nothing here cares which is which - only that the label is the same one next frame.
+  const sides = result.handedness ?? [];
 
   return hands.flatMap((hand, index) => {
     if (!hand?.[H.pinkyMcp]) return [];
@@ -191,6 +204,7 @@ export function readHands(
           y: (at(H.wrist).y + at(H.middleMcp).y) / 2,
         },
         span,
+        side: sides[index]?.[0]?.categoryName ?? `hand-${index}`,
       },
     ];
   });

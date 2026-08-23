@@ -13,6 +13,8 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const FRAMES = Number(process.env.FRAMES || 36);
+// Which model the route mounts. 'ring' is R-1028; 'hero-ring' and friends are HeroPiece.
+const PIECE = process.env.PIECE || 'ring';
 const METAL = process.env.METAL || 'white';
 const STONE = process.env.STONE || 'natural';
 const SIZE = process.env.SIZE || '16';
@@ -33,12 +35,12 @@ export default async function run(page) {
   for (let i = 0; i < FRAMES; i += 1) {
     const az = (360 / FRAMES) * i;
     await page.evaluate(
-      ([metal, stone, size, elevation, azimuth]) => {
+      ([piece, metal, stone, size, elevation, azimuth]) => {
         document.body.dataset.ready = '0';
         window.location.hash =
-          `metal=${metal}&stone=${stone}&size=${size}&el=${elevation}&az=${azimuth}`;
+          `piece=${piece}&metal=${metal}&stone=${stone}&size=${size}&el=${elevation}&az=${azimuth}`;
       },
-      [METAL, STONE, SIZE, ELEVATION, String(az)],
+      [PIECE, METAL, STONE, SIZE, ELEVATION, String(az)],
     );
 
     // Wait for the scene to declare itself settled rather than sleeping a guessed

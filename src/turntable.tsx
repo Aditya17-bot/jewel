@@ -16,11 +16,30 @@ import { StrictMode, Suspense, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as THREE from "three";
 import { EarringModel, NecklaceModel } from "./components/PieceModels";
+import { HeroPiece } from "./components/HeroPiece";
 import { RingModel } from "./components/RingModel";
 import { getRingSizeSpec } from "./data/demoData";
 import type { MetalId, RingSize, StoneId } from "./types";
 
-type PieceKind = "ring" | "necklace" | "earring";
+type PieceKind = "ring" | "necklace" | "earring" | "hero-ring" | "hero-earring" | "hero-necklace";
+
+/**
+ * Metres up to the scale this route is lit for.
+ *
+ * Two unit conventions meet here and neither is wrong. RingModel and PieceModels are
+ * authored at display scale - R-1028 measures 3.67 units across - and every other number
+ * in this file was chosen for that: the HDRI intensity, the tone-mapping exposure, the
+ * ContactShadows plane and, most sharply, the shadow camera. HeroPiece is authored in
+ * metres at real-world size, which is right for a piece that also has to sit on a hand.
+ *
+ * Dropped in unscaled it measured 0.024 units - a hundred and fifty times small - and came
+ * out of the bake almost entirely black. That reads as a material bug and is not one: a
+ * shadow camera framed for a 3.67-unit piece resolves nothing at all across a 0.024-unit
+ * one, so every surface shadows itself. Scaling here rather than in HeroPiece keeps the
+ * millimetres honest where they are needed and confines the conversion to the one file
+ * that has the other convention.
+ */
+const HERO_TO_ROUTE = 150;
 
 interface Shot {
   piece: PieceKind;
@@ -101,6 +120,11 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
       if (!found || box.isEmpty()) return;
       const sphere = box.getBoundingSphere(new THREE.Sphere());
       fit.current = { center: sphere.center.clone(), radius: sphere.radius };
+    // Published so the bake harness can see what it is actually photographing. Two pieces
+    // authored at different unit scales look identical through a camera that fits itself
+    // to each of them, and every other difference - shadow acne, exposure, clip planes -
+    // then looks like a material problem rather than a scale one.
+    document.body.dataset.radius = sphere.radius.toFixed(5);
     }
     if (!fit.current) return;
 
@@ -115,7 +139,7 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
     // approaches it face-on, so 0.92 fills the frame there without clipping the shank. A
     // pair of earrings or a chain is wide and close to its own bound in every pose, and
     // the same factor cuts the ends off - so those get room instead.
-    const fill = shot.piece === "ring" ? 0.98 : 1.24;
+    const fill = shot.piece === "ring" || shot.piece === "hero-ring" ? 0.98 : 1.24;
     const distance = (radius / Math.sin(((perspective.fov / 2) * Math.PI) / 180)) * fill;
 
     perspective.position.set(
@@ -124,6 +148,18 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
       center.z + Math.cos(az) * Math.cos(el) * distance,
     );
     perspective.lookAt(center);
+    // Clip planes from the measured sphere, not from a constant.
+    //
+    // These pieces differ in size by two orders of magnitude - R-1028 is about two units
+    // across and a hero piece modelled in metres is about two hundredths - so no single
+    // pair of numbers suits both. A fixed near of 0.1 clips a piece in metres away
+    // entirely; loosening it to 0.001 for everything fixes that piece and quietly wrecks
+    // depth precision for every other, because what a depth buffer resolves is set by the
+    // RATIO of far to near. Deriving both from the sphere keeps that ratio tight whatever
+    // is being photographed. `far` is generous because ContactShadows is a 7.5-unit plane
+    // that the fit deliberately excludes and must still be inside it.
+    perspective.near = Math.max(distance - radius * 2, distance / 500);
+    perspective.far = distance + radius * 24 + 20;
     perspective.updateProjectionMatrix();
   });
 
@@ -183,7 +219,7 @@ function Stage() {
       // buffers; a 2x pass at the hero's 1440px square asks for 2880 square on top of
       // that, and a lost context halfway through a sweep is a silently broken bake.
       dpr={supersample}
-      camera={{ position: [0, 0.2, getRingSizeSpec(shot.size).cameraDistance], fov: 32, near: 0.1, far: 100 }}
+      camera={{ position: [0, 0.2, getRingSizeSpec(shot.size).cameraDistance], fov: 32, near: 0.001, far: 100 }} /* Rig overrides both from the measured sphere on every frame */
       gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true, powerPreference: "high-performance" }}
       shadows={{ type: THREE.PCFShadowMap }}
       onCreated={({ gl }) => {
@@ -198,7 +234,15 @@ function Stage() {
       <directionalLight position={[-4, 6, 8]} intensity={1.55} castShadow shadow-mapSize={[1024, 1024]} />
       <directionalLight position={[5, 2, 6]} intensity={0.7} />
       <Suspense fallback={null}>
-        {shot.piece === "necklace" ? (
+        {shot.piece.startsWith("hero-") ? (
+          <group scale={HERO_TO_ROUTE}>
+            <HeroPiece
+              kind={shot.piece.slice(5) as "ring" | "earring" | "necklace"}
+              metal={shot.metal}
+              stone={shot.stone}
+            />
+          </group>
+        ) : shot.piece === "necklace" ? (
           <NecklaceModel metal={shot.metal} stone={shot.stone} />
         ) : shot.piece === "earring" ? (
           <EarringModel metal={shot.metal} stone={shot.stone} />

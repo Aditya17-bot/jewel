@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Environment } from "@react-three/drei";
 import * as THREE from "three";
 import type { MetalId, StoneId } from "../types";
 
@@ -10,6 +11,7 @@ import type { MetalId, StoneId } from "../types";
  * dependency of a landing-page experiment. Measurements below are metres.
  */
 export interface HeroPieceProps {
+  kind?: "ring" | "earring" | "necklace";
   metal?: MetalId;
   stone?: StoneId;
 }
@@ -90,7 +92,11 @@ function Gem({ stone, geometry }: { stone: StoneId; geometry: THREE.BufferGeomet
         color={palette.colour}
         roughness={0.035}
         metalness={0}
-        transmission={stone === "natural" || stone === "lab" ? 0.22 : 0.5}
+        /* A diamond is almost pure transmission - it has essentially no diffuse colour of
+           its own, and what you see in it is the room. At 0.22 it came out as milky white
+           plastic. Coloured stones stay slightly under 1 so the attenuation colour has
+           something to tint. */
+        transmission={stone === "natural" || stone === "lab" ? 1 : 0.92}
         thickness={0.006}
         ior={palette.ior}
         attenuationColor={palette.attenuation}
@@ -104,52 +110,76 @@ function Gem({ stone, geometry }: { stone: StoneId; geometry: THREE.BufferGeomet
 }
 
 /**
- * The Solstice pendant: a 28 mm open disc, 13 mm pear-cut centre stone and a
- * 9 mm bail. It is intentionally presentation-only; mount it in turntable.tsx
- * and bake it before exposing it on the landing page.
+ * The Solstice ring: an 18.2 mm inside diameter on a 2.1 mm shank, carrying a 13 mm
+ * pear-cut centre stone in four prongs, with a row of eleven accents over the shoulders.
+ *
+ * A real finger size, not an oversized prop. Once a piece sits on a hand a ring secretly
+ * ten times too big is much harder to notice than to prevent.
  */
-export function HeroPiece({ metal = "white", stone = "natural" }: HeroPieceProps) {
-  const gemGeometry = useMemo(createPearGemGeometry, []);
-  const prongGeometry = useMemo(() => new THREE.CapsuleGeometry(0.00062, 0.0042, 6, 10), []);
-
-  const prongs = useMemo(
-    () => [
-      { position: [-0.0045, 0.0022, 0.0015] as Vec3, rotation: [0, 0.28, -0.58] as Vec3 },
-      { position: [0.0045, 0.0022, 0.0015] as Vec3, rotation: [0, -0.28, 0.58] as Vec3 },
-      { position: [-0.0035, -0.0047, 0.0015] as Vec3, rotation: [0.15, 0.12, -1.3] as Vec3 },
-      { position: [0.0035, -0.0047, 0.0015] as Vec3, rotation: [-0.15, -0.12, 1.3] as Vec3 },
-    ],
+function SolsticeRing({ metal, stone, gemGeometry, prongGeometry }: Required<Pick<HeroPieceProps, "metal" | "stone">> & { gemGeometry: THREE.BufferGeometry; prongGeometry: THREE.BufferGeometry }) {
+  const accents = useMemo(
+    () => Array.from({ length: 11 }, (_, index) => {
+      const angle = THREE.MathUtils.lerp(-1.12, 1.12, index / 10);
+      return [Math.sin(angle) * 0.0108, Math.cos(angle) * 0.0108 + 0.0042, 0.001] as Vec3;
+    }),
     [],
   );
-
-  return (
-    <group name="solstice-hero-pendant" rotation={[0.12, -0.48, 0.08]}>
-      {/* 28 mm outer diameter; the open silhouette keeps the stone as the focal point. */}
-      <mesh position={[0, 0, -0.0018]} castShadow>
-        <torusGeometry args={[0.0125, 0.00125, 12, 72]} />
-        <Metal metal={metal} />
-      </mesh>
-
-      {/* The 9 mm bail is separate from the disc so a future chain can attach cleanly. */}
-      <mesh position={[0, 0.0173, -0.0018]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[0.0041, 0.0009, 10, 36]} />
-        <Metal metal={metal} />
-      </mesh>
-
-      <group position={[0, -0.0006, 0.001]}>
-        <Gem stone={stone} geometry={gemGeometry} />
-        {prongs.map((prong, index) => (
-          <mesh
-            key={index}
-            geometry={prongGeometry}
-            position={prong.position}
-            rotation={prong.rotation}
-            castShadow
-          >
-            <Metal metal={metal} />
-          </mesh>
-        ))}
-      </group>
+  return <group name="solstice-hand-ring" rotation={[0.2, -0.5, 0]}>
+    {/* 18.2 mm inside diameter, 2.1 mm shank: a wearable finger ring, not an oversized prop. */}
+    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow><torusGeometry args={[0.01015, 0.00105, 14, 80]} /><Metal metal={metal} /></mesh>
+    <mesh position={[0, 0.011, 0.001]}><cylinderGeometry args={[0.007, 0.006, 0.0022, 32]} /><Metal metal={metal} /></mesh>
+    <group position={[0, 0.011, 0.0028]}><Gem stone={stone} geometry={gemGeometry} />
+      {[[-0.0046, 0.002, 0.001] as Vec3, [0.0046, 0.002, 0.001] as Vec3, [-0.0033, -0.0045, 0.001] as Vec3, [0.0033, -0.0045, 0.001] as Vec3].map((position, index) =>
+        <mesh key={index} geometry={prongGeometry} position={position} rotation={[0, index % 2 ? 0.35 : -0.35, index < 2 ? 0.55 : -0.55]}><Metal metal={metal} /></mesh>,
+      )}
     </group>
+    {accents.map((position, index) => <group key={index} position={position} scale={0.19}><Gem stone="natural" geometry={gemGeometry} /></group>)}
+  </group>;
+}
+
+function SolsticeEarring({ metal, stone, gemGeometry }: Required<Pick<HeroPieceProps, "metal" | "stone">> & { gemGeometry: THREE.BufferGeometry }) {
+  return <group name="solstice-earring" rotation={[0.05, -0.4, 0]}>
+    {/* 22 mm hoop with a detachable 13 mm pear drop. */}
+    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow><torusGeometry args={[0.009, 0.0009, 12, 64, Math.PI * 1.68]} /><Metal metal={metal} /></mesh>
+    <mesh position={[0, -0.0105, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow><torusGeometry args={[0.0034, 0.00072, 10, 30]} /><Metal metal={metal} /></mesh>
+    <group position={[0, -0.017, 0.002]} rotation={[0, 0, Math.PI]}><Gem stone={stone} geometry={gemGeometry} /></group>
+  </group>;
+}
+
+function SolsticeNecklace({ metal, stone, gemGeometry }: Required<Pick<HeroPieceProps, "metal" | "stone">> & { gemGeometry: THREE.BufferGeometry }) {
+  const chain = useMemo(() => new THREE.TorusGeometry(0.024, 0.00038, 6, 80, Math.PI * 0.8), []);
+  return <group name="solstice-necklace" rotation={[0.1, -0.42, 0]}>
+    {/* 48 mm necklace arc, 28 mm pendant and 13 mm centre stone. */}
+    <mesh geometry={chain} rotation={[0, 0, Math.PI * 0.1]}><Metal metal={metal} /></mesh>
+    <mesh position={[0, -0.018, 0]} castShadow><torusGeometry args={[0.0125, 0.00125, 12, 72]} /><Metal metal={metal} /></mesh>
+    <mesh position={[0, -0.0007, 0]} castShadow><torusGeometry args={[0.0041, 0.0009, 10, 36]} /><Metal metal={metal} /></mesh>
+    <group position={[0, -0.0186, 0.002]}><Gem stone={stone} geometry={gemGeometry} /></group>
+  </group>;
+}
+
+export function HeroPiece({ kind = "ring", metal = "yellow", stone = "emerald" }: HeroPieceProps) {
+  const gemGeometry = useMemo(createPearGemGeometry, []);
+  const prongGeometry = useMemo(() => new THREE.CapsuleGeometry(0.00062, 0.0042, 6, 10), []);
+  return (
+    <>
+      {/*
+        The piece brings its own room with it.
+
+        Polished metal at metalness 0.94 has almost no colour of its own - what you see in
+        it is the environment reflected. The turntable route lights the stage with an
+        ambient and two directional lights and nothing else; RingModel mounts its own
+        `<Environment>` and that is where R-1028's silver comes from. Without one this
+        piece baked out matte black at a mean luminance of 24 against R-1028's 218 under
+        identical settings, which reads as a broken material and is really a missing room.
+      */}
+      <Environment files="/assets/studio-small-09-1k.hdr" />
+      {kind === "earring" ? (
+        <SolsticeEarring metal={metal} stone={stone} gemGeometry={gemGeometry} />
+      ) : kind === "necklace" ? (
+        <SolsticeNecklace metal={metal} stone={stone} gemGeometry={gemGeometry} />
+      ) : (
+        <SolsticeRing metal={metal} stone={stone} gemGeometry={gemGeometry} prongGeometry={prongGeometry} />
+      )}
+    </>
   );
 }

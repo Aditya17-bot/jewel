@@ -82,10 +82,28 @@ const DRAG_TO_TURN = 2.2;
  * the hands are only the controls.
  */
 const AIR_FRACTION = 0.42;
-/** Hand-widths of sideways travel for one full turn. */
-const SWEEP_TO_TURN = 1.6;
+/**
+ * Hand-widths of sideways travel for one full turn.
+ *
+ * A hand is about a quarter of the picture wide, so this is roughly one sweep from edge to
+ * edge per turn. The first attempt was 1.6, which put two and a half full turns inside one
+ * sweep - and, worse, made a tenth of a hand-width of landmark jitter worth twenty-two
+ * degrees. Measured live it was jumping two hundred degrees between readings while the
+ * hand was barely moving.
+ */
+const SWEEP_TO_TURN = 3.6;
 /** Below this fraction of the hand's own width, movement is landmark noise, not a sweep. */
-const SWEEP_DEADZONE = 0.012;
+const SWEEP_DEADZONE = 0.02;
+/**
+ * Most a sweep may turn the piece in one detection, in hand-widths.
+ *
+ * A backstop, not a speed limit: no hand crosses a quarter of its own width in 42 ms, so
+ * anything larger is the tracker changing its mind about which hand it is looking at, not
+ * a movement. Without it one swap of the list order spins the piece half a revolution.
+ */
+const SWEEP_MAX_STEP = 0.25;
+/** How much of a new palm position to believe per detection. Low-passes the landmarks. */
+const SWEEP_SMOOTHING = 0.45;
 /** How far the floating piece rises and falls, as a fraction of its own size. */
 const FLOAT_RISE = 0.035;
 /** Milliseconds for one rise and fall. Slow: a hover, not a bounce. */
@@ -222,8 +240,9 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
   const scaleRef = useRef(1);
   const spinRef = useRef(0);
   const gripRef = useRef<{ x: number; y: number; scale: number; spin: number; span: number } | null>(null);
-  /** Last position of the sweeping hand, for the turn gesture in the air. */
-  const sweepRef = useRef<{ x: number; span: number } | null>(null);
+  /** The hand doing the turning, followed by its handedness so a list reorder cannot
+   *  be mistaken for it having moved. */
+  const sweepRef = useRef<{ x: number; span: number; side: string } | null>(null);
   /** Distance between two pinched hands when the two-handed resize began. */
   const spreadRef = useRef<{ gap: number; scale: number } | null>(null);
   const modeRef = useRef<Mode>("worn");
@@ -445,20 +464,34 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
         } else {
           spreadRef.current = null;
 
-          const sweeper = heldHands[0];
+          const last = sweepRef.current;
+          // Keep following the SAME hand. MediaPipe does not promise a stable order, and
+          // with two hands up it swaps them freely - so `heldHands[0]` is a different hand
+          // from one detection to the next, and a gesture measured as a change in position
+          // reads that as the hand having jumped across the picture. Live, that was two
+          // hundred degrees of spin between readings from a hand that had barely moved.
+          const sweeper =
+            (last && heldHands.find((hand) => hand.side === last.side)) ?? heldHands[0];
+
           if (sweeper) {
-            const last = sweepRef.current;
             // Measured against the hand's own width, so the same movement turns the piece
             // the same amount at arm's length and up against the lens. The palm, not a
             // fingertip: it is the steadiest point on a hand and it is still there when
             // the fingers are doing something else.
-            if (last && last.span > 1) {
-              const dx = (sweeper.palm.x - last.x) / last.span;
+            if (last && last.side === sweeper.side && last.span > 1) {
+              const raw = (sweeper.palm.x - last.x) / last.span;
+              const dx = Math.max(-SWEEP_MAX_STEP, Math.min(SWEEP_MAX_STEP, raw));
               if (Math.abs(dx) > SWEEP_DEADZONE) {
                 spinRef.current += (dx / SWEEP_TO_TURN) * 360;
               }
             }
-            sweepRef.current = { x: sweeper.palm.x, span: sweeper.span };
+            // The stored position trails the real one, which costs a little responsiveness
+            // and buys a great deal of steadiness: the palm is derived from two landmarks
+            // and both of them shiver.
+            const followed = last && last.side === sweeper.side
+              ? last.x + (sweeper.palm.x - last.x) * SWEEP_SMOOTHING
+              : sweeper.palm.x;
+            sweepRef.current = { x: followed, span: sweeper.span, side: sweeper.side };
           } else {
             sweepRef.current = null;
           }
