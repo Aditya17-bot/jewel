@@ -39,78 +39,78 @@
   },
   "necklace": {
     "white-natural": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "white-ruby": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "white-emerald": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "yellow-natural": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "yellow-ruby": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "yellow-emerald": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "rose-natural": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "rose-ruby": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     },
     "rose-emerald": {
-      "frames": 1,
-      "frameMm": 24.0
+      "frames": 24,
+      "frameMm": 26.97
     }
   },
   "earring": {
     "white-natural": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "white-ruby": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "white-emerald": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "yellow-natural": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "yellow-ruby": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "yellow-emerald": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "rose-natural": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "rose-ruby": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     },
     "rose-emerald": {
-      "frames": 1,
-      "frameMm": 9.86
+      "frames": 24,
+      "frameMm": 9.0
     }
   }
 }
