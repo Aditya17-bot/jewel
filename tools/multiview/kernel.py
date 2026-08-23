@@ -60,7 +60,13 @@ if torch.cuda.is_available():
         raise SystemExit(f"torch {torch.__version__} has no sm_{cap[0]}{cap[1]} kernels; "
                          f"targets are {arch}")
 
-OUT = "/kaggle/working/views/heart-vine-ring"
+# SLUG, PASSES and COND_B64 are spliced in above by tools/multiview/twin.py. The defaults
+# here are only so this file still reads as a program on its own; a real run always
+# carries all three.
+SLUG = globals().get("SLUG", "piece")
+PASSES = globals().get("PASSES", ["a"])
+
+OUT = "/kaggle/working/views/" + SLUG
 os.makedirs(OUT, exist_ok=True)
 
 # Zero123++ v1.1/v1.2 emit a fixed 3x2 grid of 320px tiles at these poses, row-major.
@@ -146,16 +152,23 @@ try:
     # absolute elevation. This is the only way to get a second axis out of a model whose
     # poses are fixed, and it is an approximation twice over - the error of pass A is baked
     # into the input of pass B, and composing two spherical rotations is not the same as
-    # adding their angles. Worth measuring rather than asserting.
+    # adding their angles.
+    #
+    # It was measured, and it does not work: pass B lost the heart cabochon entirely and
+    # turned the vines to generic filigree. Compounding error, not a tuning problem. So
+    # they are off by default and PASSES has to ask for them - kept rather than deleted
+    # because the next model may be worth trying the same way.
     tiers = [{"tag": "a", "from": None, "el": 0}]
     for tag, index, seed in (("b", 1, 11), ("c", 0, 13)):
+        if tag not in PASSES:
+            continue
         source = base[index].convert("RGB")
         # Matte again: the model paints a grey ground into every tile, and feeding that
         # back as an object would have pass B reconstructing the backdrop too.
         sweep(matte(source), tag, seed)
         tiers.append({"tag": tag, "from": POSES[index], "el": POSES[index]["elevation"]})
 
-    report = {"passes": tiers, "poses": POSES, "views_per_pass": len(POSES),
+    report = {"slug": SLUG, "passes": tiers, "poses": POSES, "views_per_pass": len(POSES),
               "matte": "rembg" if HAVE_REMBG else "threshold"}
     print("OK", flush=True)
 

@@ -13,3 +13,6 @@ coverage/
 # In-progress local audit captures are not part of the product source.
 qa/audit-2026-08-21/
 .codex-audit/
+
+# tools/multiview/twin.py staging: a spliced kernel with a 180 KB blob in it
+.twin-stage/

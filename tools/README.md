@@ -60,12 +60,33 @@ none is wanted: a ring band is thinner than a voxel in any grid a reconstruction
 afford, and a chain is high-genus multi-component, so mesh extraction returns sludge.
 Novel-view diffusion never represents geometry, so it has nothing to lose.
 
+One command, photograph to catalogue entry:
+
 ```bash
-python tools/multiview/prep.py path/to/piece.png   # crop, centre, 512px, writes cond.b64
-python tools/multiview/inline.py                   # splice the image into the kernel
-kaggle kernels push -p tools/multiview
-kaggle kernels output adityasridhar077/aurelia-multiview -p out/
+python tools/multiview/twin.py path/to/piece.png     --slug heart-vine-ring --id R-2201 --name "Heart Vine Ring"     --worn finger --width-mm 21
 ```
+
+It crops and mattes the photo, splices it into the kernel, pushes to Kaggle, waits for the
+GPU run, downloads the six views into `public/twins/<slug>/`, cuts the still the live
+camera wears into `public/pieces/<slug>.png`, and regenerates `src/data/twins.ts` — which
+`src/data/pieces.ts` reads. **No hand-written file is edited to add a piece.**
+
+The middle stage needs a GPU that is not on this machine, so it stays separable:
+
+```bash
+# no Kaggle token: prepare the kernel, run the notebook in a browser, install the output
+python tools/multiview/twin.py piece.png --slug my-ring --prep-only
+python tools/multiview/twin.py --slug my-ring --id R-3000 --from ./downloaded-output
+
+# correct a width, a name or an id without touching the GPU at all
+python tools/multiview/twin.py --slug my-ring --width-mm 19 --register-only
+```
+
+`--width-mm` is the one number that cannot be measured: a photograph carries no scale, and
+the same picture could be a signet ring or a bangle. Everything else is derived.
+
+Passes B and C are off by default (`--passes a`). They were measured and they lose the
+subject — see below.
 
 The conditioning image is embedded in the kernel rather than mounted as a dataset: an
 attached dataset showed up in the kernel metadata server-side and still produced no

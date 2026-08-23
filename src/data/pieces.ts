@@ -17,6 +17,7 @@
 import type { WornPiece } from "../components/LiveTryOn";
 import type { MetalId, StoneId } from "../types";
 import { WORN } from "./worn";
+import { GENERATED_TWINS, type GeneratedTwin } from "./twins";
 
 export type WornOn = "ears" | "finger" | "neck";
 export type TwinSource = "rendered" | "generated";
@@ -72,9 +73,40 @@ function baked(dir: string, tiers: number): string[][] {
   );
 }
 
-/** The six views tools/multiview returns, in azimuth order. */
-function generated(dir: string): string[][] {
-  return [Array.from({ length: 6 }, (_, index) => `${dir}/view_${index}.png`)];
+/**
+ * A piece the catalogue has only a photograph of, as tools/multiview/twin.py installed it.
+ *
+ * There is no hand-written entry for one of these. `twin.py` writes the manifest and
+ * regenerates `twins.ts`, and this turns a row of it into a `Piece` - so publishing a
+ * photographed piece is one command and touches no source file a person maintains.
+ *
+ * Metal and stone are ignored throughout, and that is not an oversight: there is one
+ * photograph, of one piece, in one metal. Pretending otherwise would show a customer a
+ * rose-gold version of a ring that has never existed.
+ */
+function fromGenerated(twin: GeneratedTwin): Piece {
+  const dir = `/twins/${twin.slug}`;
+  const cutout = `/pieces/${twin.slug}.png`;
+  return {
+    id: twin.id,
+    name: twin.name,
+    wornOn: twin.wornOn,
+    source: "generated",
+    widthMm: twin.widthMm,
+    elevations: [0],
+    note: twin.note,
+    frames: () => [Array.from({ length: twin.views }, (_, index) => `${dir}/view_${index}.png`)],
+    cutout: () => cutout,
+    // One photograph, so one view, and the piece in it already fills the picture - which
+    // is why the whole frame is worth the piece's real width here and a baked frame's is
+    // not. See tools/tryon/build-worn.py for the other case.
+    worn: () => ({
+      frames: [cutout],
+      frameMm: twin.widthMm,
+      wornOn: twin.wornOn,
+      label: `${twin.id} · ${twin.wornOn === "ears" ? "both ears" : twin.wornOn === "neck" ? "at the collarbone" : "ring finger"}`,
+    }),
+  };
 }
 
 export const PIECES: Piece[] = [
@@ -132,24 +164,7 @@ export const PIECES: Piece[] = [
       label: "E-2419 · both ears",
     }),
   },
-  {
-    id: "R-2201",
-    name: "Heart Vine Ring",
-    wornOn: "finger",
-    source: "generated",
-    widthMm: 21,
-    elevations: [0],
-    note: "Built from one photograph, so it turns in 60° steps and keeps its own metal.",
-    frames: () => generated("/twins/heart-vine-ring"),
-    cutout: () => "/pieces/heart-vine-ring.png",
-    // One photograph, so one view, and the piece in it fills the picture already.
-    worn: () => ({
-      frames: ["/pieces/heart-vine-ring.png"],
-      frameMm: 21,
-      wornOn: "finger" as const,
-      label: "R-2201 · ring finger",
-    }),
-  },
+  ...GENERATED_TWINS.map(fromGenerated),
 ];
 
 export function findPiece(id: string): Piece | undefined {

@@ -1,0 +1,18 @@
+{
+  "heart-vine-ring": {
+    "id": "R-2201",
+    "name": "Heart Vine Ring",
+    "wornOn": "finger",
+    "widthMm": 21.0,
+    "note": "Built from one photograph, so it turns in 60 degree steps and keeps its own metal.",
+    "views": 6
+  },
+  "rose-halo-stud": {
+    "id": "E-3310",
+    "name": "Rose Halo Stud",
+    "wornOn": "ears",
+    "widthMm": 9.0,
+    "note": "Built from one photograph, so it turns in 60 degree steps and keeps its own metal.",
+    "views": 6
+  }
+}
