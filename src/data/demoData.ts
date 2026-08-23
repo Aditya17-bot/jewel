@@ -1,5 +1,4 @@
 import type {
-  CollectionProduct,
   Configuration,
   MaterialOption,
   Product,
@@ -128,45 +127,6 @@ export function getConfigurationAsset(configuration: Configuration): string {
   if (configuration.stone === "emerald") return "/assets/hero-ring-emerald.png";
   return materialOptions.find((option) => option.id === configuration.metal)?.asset ?? flagshipProduct.image;
 }
-
-export const collectionProducts: CollectionProduct[] = [
-  {
-    id: "R-1028",
-    name: "Diamond Halo Ring",
-    category: "Ring",
-    status: "Ready",
-    image: "/assets/hero-ring-white.png",
-  },
-  {
-    id: "N-1032",
-    name: "Solstice Pendant",
-    category: "Necklace",
-    status: "Ready",
-    image: "/assets/collection-necklace.png",
-  },
-  {
-    id: "E-2419",
-    name: "Rose Halo Studs",
-    category: "Earrings",
-    status: "Ready",
-    image: "/assets/collection-earrings.png",
-  },
-  {
-    id: "B-7821",
-    name: "Constellation Tennis Bracelet",
-    category: "Bracelet",
-    status: "Processing",
-    image: "/assets/collection-bracelet.png",
-  },
-];
-
-export const demoMetrics = [
-  ["482", "Products"],
-  ["24,580", "Views"],
-  ["1,204", "Configurations"],
-  ["382", "Shares"],
-  ["94", "Quote Requests"],
-] as const;
 
 export function formatInr(value: number): string {
   return new Intl.NumberFormat("en-IN", {

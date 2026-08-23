@@ -16,9 +16,6 @@ interface BrandHeaderProps {
 const navItems: Array<{ label: string; view: AppView }> = [
   { label: "Digital Twin", view: "twin" },
   { label: "Try It On", view: "tryon" },
-  { label: "Collections", view: "collections" },
-  { label: "Manufacturer Value", view: "value" },
-  { label: "Future", view: "future" },
 ];
 
 export function BrandHeader({ activeView, onNavigate, onPilot }: BrandHeaderProps) {

@@ -1,17 +1,17 @@
-import { ArrowDown, ArrowRight, LockSimple, SlidersHorizontal } from "@phosphor-icons/react";
+import { ArrowRight, Camera, LockSimple, SlidersHorizontal } from "@phosphor-icons/react";
 import { HERO_FRAMES } from "../data/pieces";
 import { TurntableViewer } from "./TurntableViewer";
 
 interface LandingHeroProps {
   onExplore: () => void;
-  onWorkflow: () => void;
+  onTryOn: () => void;
 }
 
 // The hero turns on its own until someone takes hold of it. Only the level tier is loaded
 // - about 700 KB - because the landing page should not fetch a tilt nobody asked for.
 const HERO_SPIN_DEGREES_PER_FRAME = 0.28;
 
-export function LandingHero({ onExplore, onWorkflow }: LandingHeroProps) {
+export function LandingHero({ onExplore, onTryOn }: LandingHeroProps) {
 
   return (
     <main className="landing" id="top">
@@ -27,8 +27,11 @@ export function LandingHero({ onExplore, onWorkflow }: LandingHeroProps) {
             <button className="button button-dark" onClick={onExplore}>
               Explore live demo <ArrowRight size={18} />
             </button>
-            <button className="button button-quiet" onClick={onWorkflow}>
-              See manufacturer workflow <ArrowDown size={17} />
+            {/* Was "See manufacturer workflow", which scrolled to a demo-data pitch deck.
+                It points at the camera now: the second thing this page does, rather than
+                the second thing it claimed. */}
+            <button className="button button-quiet" onClick={onTryOn}>
+              Try it on yourself <Camera size={17} />
             </button>
           </div>
           <div className="landing-assurance" aria-label="Product assurances">

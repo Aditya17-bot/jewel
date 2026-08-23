@@ -22,9 +22,7 @@ import type { AppView, Configuration } from "./types";
 
 function getInitialView(): AppView {
   const requested = new URLSearchParams(window.location.search).get("view");
-  return requested === "twin" || requested === "tryon" || requested === "collections" || requested === "value" || requested === "future"
-    ? requested
-    : "reveal";
+  return requested === "twin" || requested === "tryon" ? requested : "reveal";
 }
 
 function getInitialConfiguration(): Configuration {
@@ -75,7 +73,7 @@ export function App() {
       return;
     }
 
-    const targetId = activeView === "twin" ? "digital-twin" : activeView === "tryon" ? "try-on" : activeView;
+    const targetId = activeView === "twin" ? "digital-twin" : "try-on";
     window.requestAnimationFrame(() => {
       document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -97,7 +95,7 @@ export function App() {
       <BrandHeader activeView={activeView} onNavigate={navigate} onPilot={() => setLeadMode("pilot")} />
 
       {!experienceVisible ? (
-        <LandingHero onExplore={() => navigate("twin")} onWorkflow={() => navigate("collections")} />
+        <LandingHero onExplore={() => navigate("twin")} onTryOn={() => navigate("tryon")} />
       ) : (
         <main className="experience">
           <section className="digital-twin-workspace" id="digital-twin">
@@ -125,11 +123,7 @@ export function App() {
           </SectionBoundary>
 
           <TrustStrip />
-          <SupportingExperience
-            onViewProduct={() => navigate("twin")}
-            onShare={() => setShareOpen(true)}
-            onPilot={() => setLeadMode("pilot")}
-          />
+          <SupportingExperience onPilot={() => setLeadMode("pilot")} />
         </main>
       )}
 

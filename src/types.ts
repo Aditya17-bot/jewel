@@ -1,7 +1,7 @@
 export type MetalId = "white" | "yellow" | "rose";
 export type StoneId = "natural" | "lab" | "ruby" | "emerald";
 export type RingSize = 14 | 15 | 16 | 17 | 18 | 19 | 20;
-export type AppView = "reveal" | "twin" | "tryon" | "collections" | "value" | "future";
+export type AppView = "reveal" | "twin" | "tryon";
 
 export interface MaterialOption {
   id: MetalId;
@@ -39,14 +39,6 @@ export interface Configuration {
   stone: StoneId;
   size: RingSize;
   engraving: string;
-}
-
-export interface CollectionProduct {
-  id: string;
-  name: string;
-  category: string;
-  status: "Ready" | "Processing";
-  image: string;
 }
 
 export interface QuoteFormData {
