@@ -1,0 +1,21 @@
+name = "aurelia-antlers"
+main = "worker/index.js"
+compatibility_date = "2026-08-01"
+
+# The whole site is static: 1,650 files, no database, no KV, no queue, no secrets.
+# The Worker exists only to serve them and to send unknown paths to index.html, because
+# this is a single-page app and a deep link must not 404.
+[assets]
+directory = "dist/client"
+binding = "ASSETS"
+
+# not_found_handling is deliberately left at its default ("none").
+#
+# Cloudflare's own single-page-app mode would rewrite every miss to index.html, including
+# a missing .webp frame - so a bad asset path would return an HTML document with status
+# 200, and the turntable would silently draw nothing rather than raise one. The Worker
+# does the fallback itself and only for GET/HEAD requests that actually asked for HTML,
+# which keeps a missing frame a 404 where it belongs.
+
+[observability]
+enabled = true

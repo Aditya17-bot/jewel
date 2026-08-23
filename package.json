@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
-    "test:sites": "node --test tests/sites-worker.test.mjs"
+    "test:sites": "node --test tests/sites-worker.test.mjs",
+    "deploy": "npm run build && npm run test:sites && wrangler deploy"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
