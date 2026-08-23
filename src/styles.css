@@ -534,7 +534,25 @@ img { display: block; max-width: 100%; }
 .stone-icon { width: 42px; height: 36px; display: grid; place-items: center; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.12)); }
 .stone-icon img { width: 40px; height: 40px; object-fit: contain; mix-blend-mode: multiply; }
 .size-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-.size-option { height: 34px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 11px; }
+.size-option {
+  height: 34px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+/* These had no hover and no focus ring at all, which is most of what made a page of them
+   read as a wireframe rather than as a product. */
+.size-option:hover { border-color: var(--line-dark); background: var(--paper); }
+.size-option.is-selected:hover { border-color: var(--gold-dark); }
+.material-option:focus-visible,
+.stone-option:focus-visible,
+.size-option:focus-visible,
+.try-on-upload:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
 .size-spec {
   margin: 8px 0 0;
   color: #737873;
@@ -771,12 +789,15 @@ img { display: block; max-width: 100%; }
   margin-top: 10px;
   width: 100%;
   height: 38px;
+  transition: border-color 140ms ease, background 140ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   font-size: 11px;
 }
+
+.try-on-upload:hover { border-color: var(--forest-soft); background: var(--paper); }
 
 .hand-snap { display: block; }
 .hand-snap-live {
@@ -818,7 +839,17 @@ img { display: block; max-width: 100%; }
 .flat-stage { position: absolute; inset: 0; display: grid; place-items: center; padding: 26px 26px 78px; }
 /* Fill the stage rather than sitting at the photograph's own pixel size, which for a
    phone-sized portrait is a postage stamp in the middle of a very large panel. */
-.flat-canvas { height: 100%; width: auto; max-width: 100%; }
+/* Matted rather than floating. A portrait photograph in an 827px-wide panel leaves a
+   great deal of ground either side of it; a hairline and a soft shadow make that ground
+   read as matting round a mounted print instead of as space nobody filled. */
+.flat-canvas {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid var(--line-dark);
+  box-shadow: 0 26px 64px -34px rgba(16, 22, 16, 0.5);
+}
 
 .stage-mode {
   position: absolute;
@@ -883,6 +914,17 @@ img { display: block; max-width: 100%; }
    third and magnified what was left - which reads as a distorted, zoomed-in picture, and
    put a hand held anywhere but dead centre outside the frame entirely. */
 .twin-half .live-stage { width: 100%; aspect-ratio: 4 / 3; min-height: 0; }
+/* Two panels of content, not one full-bleed stage. 870px was sized for the single big
+   viewer above, and here it left a 413px-wide turntable centred in 835px of height with
+   210px of nothing above and below it, and the camera column pinned to the top of the
+   same void. Both halves now fill what they are given. */
+.twin-workspace,
+.twin-workspace .viewer-shell { min-height: 660px; }
+.photo-workspace,
+.photo-workspace .viewer-shell { min-height: 780px; }
+.twin-half .live-tryon { justify-content: center; }
+.twin-stage { display: grid; place-items: center; padding: 18px 18px 34px; }
+
 @media (max-width: 900px) {
   .twin-split { position: static; grid-template-columns: 1fr; }
   .twin-stage { min-height: 320px; }
@@ -896,7 +938,9 @@ img { display: block; max-width: 100%; }
   width: 100%;
   aspect-ratio: 4 / 3;
   overflow: hidden;
-  background: #14151a;
+  /* Not a flat slab. The camera is off most of the time a person looks at this, so what
+     they judge the feature by is this rectangle sitting there. */
+  background: radial-gradient(circle at 50% 38%, #23252c 0, #14151a 62%, #0e0f13 100%);
   border: 1px solid var(--line);
 }
 /* The video is the source the model reads, never what anyone looks at: the canvas carries
@@ -930,8 +974,34 @@ img { display: block; max-width: 100%; }
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
-.live-controls { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.live-piece { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+/* The camera's own controls. These had no styling at all: the start button was a raw
+   browser button whose label overflowed its own border, sitting next to a segmented
+   control at a different height. One column, three rows, everything the same width. */
+.live-controls { display: grid; gap: 9px; }
+.live-controls > button {
+  height: 42px;
+  padding: 0 18px;
+  border: 1px solid var(--forest);
+  background: var(--forest);
+  color: #fbfaf5;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.live-controls > button:hover:not([disabled]) { background: transparent; color: var(--forest); }
+.live-controls > button[disabled] { opacity: 0.5; cursor: default; }
+.live-controls > button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.live-piece {
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
 
 /* No WebGL: frames baked from the same RingModel, so the ring still turns. Every frame
    sits stacked and only one is opaque - swapping a src instead would force a fresh decode
@@ -1002,11 +1072,13 @@ img { display: block; max-width: 100%; }
 /* Where the piece goes: on you, or held up in your hand to be looked at. Two states of one
    control, so they read as a pair rather than as two unrelated buttons. */
 .live-modes {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   border: 1px solid rgba(43,73,51,0.18);
 }
 .live-modes button {
-  padding: 7px 14px;
+  height: 34px;
+  padding: 0 10px;
   border: 0;
   background: transparent;
   color: var(--forest-soft);

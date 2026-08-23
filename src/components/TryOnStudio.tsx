@@ -1,4 +1,4 @@
-import { Camera, Cube, LockSimple, UploadSimple } from "@phosphor-icons/react";
+import { Camera, LockSimple, UploadSimple } from "@phosphor-icons/react";
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -500,7 +500,7 @@ export function TryOnStudio() {
   }, [pieces, jewel]);
 
   return (
-    <section className="digital-twin-workspace" id="try-on-photo" ref={sectionRef}>
+    <section className="digital-twin-workspace photo-workspace" id="try-on-photo" ref={sectionRef}>
       <div className="viewer-shell">
         <div className="product-stage three-stage try-on-stage" role="img" aria-label="Jewellery shown worn">
           {!vision && (
@@ -542,10 +542,11 @@ export function TryOnStudio() {
           </div>
         </div>
 
+        {/* Was "Drag to turn the head · Scroll to come closer", next to a reset button.
+            Neither is true: this stage is Canvas 2D and has no orbit at all. */}
         <div className="viewer-footnote">
           <span className="scale-mark">10 mm</span>
-          <span>Drag to turn the head&nbsp;&nbsp;·&nbsp;&nbsp;Scroll to come closer</span>
-          <button onClick={() => setResetKey((key) => key + 1)} aria-label="Reset the view"><Cube size={20} /></button>
+          <span>One light falls on the skin and the piece together — that is the comparison</span>
         </div>
       </div>
 

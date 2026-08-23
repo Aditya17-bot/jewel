@@ -111,7 +111,7 @@ export function TwinTryOn() {
   const step = (n: number) => n + (variable ? 1 : 0);
 
   return (
-    <section className="digital-twin-workspace" id="try-on">
+    <section className="digital-twin-workspace twin-workspace" id="try-on">
       <div className="viewer-shell">
         <div className="twin-split">
           <div className="twin-half">
