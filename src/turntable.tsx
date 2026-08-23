@@ -21,7 +21,18 @@ import { RingModel } from "./components/RingModel";
 import { getRingSizeSpec } from "./data/demoData";
 import type { MetalId, RingSize, StoneId } from "./types";
 
-type PieceKind = "ring" | "necklace" | "earring" | "hero-ring" | "hero-earring" | "hero-necklace";
+type PieceKind =
+  | "ring"
+  | "necklace"
+  | "earring"
+  // The same two pieces with only the worn part rendered - the drop without its chain,
+  // one stud instead of the pair. tools/tryon/build-worn.py photographs these, so the
+  // cut-out needs no stencil and survives a full turn.
+  | "necklace-worn"
+  | "earring-worn"
+  | "hero-ring"
+  | "hero-earring"
+  | "hero-necklace";
 
 /**
  * Metres up to the scale this route is lit for.
@@ -40,6 +51,9 @@ type PieceKind = "ring" | "necklace" | "earring" | "hero-ring" | "hero-earring" 
  * that has the other convention.
  */
 const HERO_TO_ROUTE = 150;
+
+/** Pieces compact enough to fill the frame at the tight fit. See `fill` in Rig. */
+const COMPACT = new Set<PieceKind>(["ring", "hero-ring"]);
 
 interface Shot {
   piece: PieceKind;
@@ -139,7 +153,7 @@ function Rig({ shot, token }: { shot: Shot; token: string }) {
     // approaches it face-on, so 0.92 fills the frame there without clipping the shank. A
     // pair of earrings or a chain is wide and close to its own bound in every pose, and
     // the same factor cuts the ends off - so those get room instead.
-    const fill = shot.piece === "ring" || shot.piece === "hero-ring" ? 0.98 : 1.24;
+    const fill = COMPACT.has(shot.piece) ? 0.98 : 1.24;
     const distance = (radius / Math.sin(((perspective.fov / 2) * Math.PI) / 180)) * fill;
 
     perspective.position.set(
@@ -242,10 +256,10 @@ function Stage() {
               stone={shot.stone}
             />
           </group>
-        ) : shot.piece === "necklace" ? (
-          <NecklaceModel metal={shot.metal} stone={shot.stone} />
-        ) : shot.piece === "earring" ? (
-          <EarringModel metal={shot.metal} stone={shot.stone} />
+        ) : shot.piece === "necklace" || shot.piece === "necklace-worn" ? (
+          <NecklaceModel metal={shot.metal} stone={shot.stone} worn={shot.piece === "necklace-worn"} />
+        ) : shot.piece === "earring" || shot.piece === "earring-worn" ? (
+          <EarringModel metal={shot.metal} stone={shot.stone} worn={shot.piece === "earring-worn"} />
         ) : (
           <RingModel metal={shot.metal} stone={shot.stone} size={shot.size} />
         )}

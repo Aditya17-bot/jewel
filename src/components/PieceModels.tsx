@@ -26,6 +26,22 @@ type Point3 = [number, number, number];
 interface PieceProps {
   metal: MetalId;
   stone: StoneId;
+  /**
+   * Render only the part that is actually worn: the drop without its chain, one stud
+   * without the other.
+   *
+   * The catalogue twin is a product shot - a pendant on a length of chain, a pair of studs
+   * turned differently so you can see both faces. What goes on a customer is one drop at
+   * their collarbone, on a chain drawn to fit their neck, and one stud on each ear.
+   *
+   * This used to be done afterwards, by cutting the unwanted part out of the baked pixels.
+   * That works on a single face-on frame and fails across a full turn, three ways: a
+   * horizontal cut cannot separate a chain whose ends hang level with the drop; a stencil
+   * taken from one frame cuts through a different part of the piece in the next; and an
+   * opening by thickness eats a transparent stone as readily as a chain. Here the two
+   * things are already separate objects, so there is nothing to separate.
+   */
+  worn?: boolean;
 }
 
 const HDRI = "/assets/studio-small-09-1k.hdr";
@@ -230,7 +246,7 @@ function Chain({ metal }: { metal: MetalId }) {
 }
 
 /** N-1032, the Solstice pendant: a haloed drop on a cable chain. */
-export function NecklaceModel({ metal, stone }: PieceProps) {
+export function NecklaceModel({ metal, stone, worn = false }: PieceProps) {
   const environment = useEnvironment({ files: HDRI });
   // MeshRefractionMaterial samples a cube map; handed the equirect HDRI it renders black.
   // The ring paints a small cube probe for exactly this, so the stones match across pieces.
@@ -239,7 +255,7 @@ export function NecklaceModel({ metal, stone }: PieceProps) {
   return (
     <>
       <group position={[0, 1.35, 0]}>
-        <Chain metal={metal} />
+        {!worn && <Chain metal={metal} />}
 
         <group position={[0, -0.16, 0]}>
           {/* The bail: the loop the chain passes through. */}
@@ -259,14 +275,17 @@ export function NecklaceModel({ metal, stone }: PieceProps) {
 }
 
 /** E-2419, the halo studs. A pair, turned differently, so one view reads as two earrings. */
-export function EarringModel({ metal, stone }: PieceProps) {
+export function EarringModel({ metal, stone, worn = false }: PieceProps) {
   const environment = useEnvironment({ files: HDRI });
   const gemProbe = useMemo(() => createBrightGemEnvironment(), []);
 
-  const studs: { position: Point3; rotation: Point3 }[] = [
+  const pair: { position: Point3; rotation: Point3 }[] = [
     { position: [-1.05, 0.22, 0], rotation: [0, -0.34, 0] },
     { position: [1.05, -0.22, -0.25], rotation: [0, 0.4, 0] },
   ];
+  // One stud, centred, when it is going on an ear. Only one is drawn per ear, and a pair
+  // offset to either side would put the second one out on the cheek.
+  const studs = worn ? [{ position: [0, 0, 0] as Point3, rotation: [0, 0, 0] as Point3 }] : pair;
 
   return (
     <>

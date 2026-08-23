@@ -21,6 +21,7 @@
 import json
 import os
 import sys
+import numpy as np
 from PIL import Image, ImageFilter
 
 METALS = ["white", "yellow", "rose"]
@@ -35,6 +36,17 @@ OPENING = 21
 # How far the stencil is grown back before it is applied, so the piece keeps its soft
 # antialiased edge and only things well clear of it are erased.
 STENCIL_GROW = 15
+# The resolution both of those were measured at. A morphological opening is defined in
+# PIXELS, so the same numbers on a 640px source erode a third more of the piece than they
+# were meant to - and the difference between "removes the chain" and "removes the pendant"
+# is only a factor of a few. Scaled at use rather than re-tuned.
+TUNED_AT = 1024
+
+
+def odd(value, floor=3):
+    """Nearest odd integer at or above `floor`. PIL's rank filters require an odd size."""
+    n = max(floor, int(round(value)))
+    return n if n % 2 else n + 1
 
 
 def frames_of(directory, tier=0):
@@ -70,51 +82,89 @@ def union(boxes):
     )
 
 
-def pendant_stencil(image):
-    """The drop, without the chain that carries it.
+def biggest_blob(mask):
+    """The largest 4-connected region of a 0/255 mask, as a 0/255 mask.
 
-    Told apart by THICKNESS, and as a shape rather than as a horizontal cut. Two earlier
-    attempts failed for the same underlying reason: the chain hangs in an arc whose two
-    ends come down BESIDE the drop, level with it, so there is no row anywhere in the
-    picture that has chain above it and only pendant below. Nothing that splits the frame
-    into a top and a bottom can work.
+    Everything worn here is ONE object photographed next to something that is not it: a
+    pendant beside its chain, a stud beside the other stud of the pair. After the chain has
+    been thinned away, whatever is still standing and separate is the thing we do not want,
+    and the piece is always the biggest of what is left.
+    """
+    try:
+        from scipy import ndimage
+        labels, count = ndimage.label(np.array(mask) > 127)
+        if count <= 1:
+            return mask
+        sizes = np.bincount(labels.ravel())
+        sizes[0] = 0
+        keep = labels == sizes.argmax()
+    except ImportError:
+        keep = _flood_biggest(np.array(mask) > 127)
+    return Image.fromarray((keep * 255).astype(np.uint8), "L")
 
-    A morphological opening can. Erode then dilate by more than a chain link is thick and
-    the chain is gone wherever it runs, while the disc - two hundred pixels across - is
-    barely touched. Growing the survivor back a little restores the soft edge the opening
-    trimmed, and everything still standing that far from the drop is chain.
+
+def _flood_biggest(occupied):
+    """biggest_blob without scipy. Slower, and the answer is identical."""
+    height, width = occupied.shape
+    seen = np.zeros_like(occupied)
+    best = np.zeros_like(occupied)
+    best_size = 0
+    for y0, x0 in zip(*np.nonzero(occupied)):
+        if seen[y0, x0]:
+            continue
+        blob = np.zeros_like(occupied)
+        stack = [(y0, x0)]
+        seen[y0, x0] = True
+        size = 0
+        while stack:
+            y, x = stack.pop()
+            blob[y, x] = True
+            size += 1
+            for ny, nx in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if 0 <= ny < height and 0 <= nx < width and occupied[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    stack.append((ny, nx))
+        if size > best_size:
+            best_size, best = size, blob
+    return best
+
+
+def worn_stencil(image, thin_away):
+    """The one piece that is actually worn, without whatever was photographed beside it.
+
+    Two steps, and both are needed. A morphological opening removes anything THINNER than
+    the erosion - which is how a chain is told from the drop it carries, as a matter of
+    thickness rather than of position. That alone is not enough across a full turn: a chain
+    seen end-on is foreshortened into something thick enough to survive, and the second stud
+    of a pair is not thin at all. So whatever is left is then reduced to its largest
+    connected region, which is the piece.
+
+    `thin_away` is False for a pair of studs, where there is nothing thin to remove and an
+    opening would only round the piece off.
+
+    Two earlier attempts failed on the same misunderstanding, and are worth recording. The
+    first cut the frame at a horizontal line; the chain hangs in an arc whose ends come down
+    BESIDE the drop, level with it, so no row has chain above and pendant below. The second
+    took one stencil from frame 0 and reused it for all 24 azimuths; the piece turns, so a
+    column that isolated the near stud head-on cuts through the far one in profile.
     """
     alpha = image.split()[3].point(lambda v: 255 if v >= ALPHA_FLOOR else 0)
-    opened = alpha.filter(ImageFilter.MinFilter(OPENING)).filter(ImageFilter.MaxFilter(OPENING))
-    if not opened.getbbox():
+
+    kept = alpha
+    if thin_away:
+        opening = odd(OPENING * image.width / TUNED_AT)
+        kept = alpha.filter(ImageFilter.MinFilter(opening)).filter(ImageFilter.MaxFilter(opening))
+        if not kept.getbbox():
+            return None
+
+    kept = biggest_blob(kept)
+    if not kept.getbbox():
         return None
-    return opened.filter(ImageFilter.MaxFilter(STENCIL_GROW * 2 + 1))
 
-
-def left_stud_stencil(image):
-    """The left-hand stud of the pair.
-
-    Only one earring is drawn per ear, and the pair is photographed turned differently on
-    purpose - so take the one facing the camera and leave the three-quarter one behind.
-    """
-    alpha = image.split()[3]
-    w, h = image.size
-    occupied = [
-        1 if alpha.crop((x, 0, x + 1, h)).point(lambda v: 255 if v >= ALPHA_FLOOR else 0).getbbox() else 0
-        for x in range(w)
-    ]
-    runs, start = [], None
-    for x, filled in enumerate(occupied + [0]):
-        if filled and start is None:
-            start = x
-        if not filled and start is not None:
-            runs.append((start, x))
-            start = None
-    if not runs:
-        return None
-    stencil = Image.new("L", (w, h), 0)
-    stencil.paste(255, (runs[0][0], 0, runs[0][1], h))
-    return stencil
+    # Grown back before it is applied, so the piece keeps its soft antialiased edge and
+    # only things well clear of it are erased.
+    grow = odd(STENCIL_GROW * image.width / TUNED_AT * 2 + 1)
+    return kept.filter(ImageFilter.MaxFilter(grow))
 
 
 def square(box, size):
@@ -140,10 +190,18 @@ def build(name, source_dir, stencil_of, keep_frames, width_mm, out_root, manifes
                 continue
 
             chosen = images if keep_frames is None else [images[i] for i in keep_frames]
-            # One stencil for the whole configuration, from the first frame. The geometry
-            # does not move between azimuths, only the light on it does.
-            stencil = stencil_of(chosen[0]) if stencil_of else None
-            chosen = [masked(image, stencil) for image in chosen]
+            # A stencil per frame, not one for the configuration.
+            #
+            # It used to take the stencil from frame 0 and apply it to everything, which was
+            # harmless while only frame 0 was kept. Across 24 azimuths it is not: the piece
+            # turns, so a column that isolated the near stud head-on cuts through the far
+            # one in profile, and a chain that was clear of the pendant in one pose crosses
+            # it in another. Both showed as debris in the cut-out.
+            #
+            # The CROP stays shared - it is the union of every frame's box - because
+            # cropping each frame to its own content would re-centre the piece on every
+            # frame and turning it would make it wander around the finger.
+            chosen = [masked(image, stencil_of(image)) if stencil_of else image for image in chosen]
 
             box = union([solid_bbox(image) for image in chosen])
             if not box:
@@ -157,13 +215,18 @@ def build(name, source_dir, stencil_of, keep_frames, width_mm, out_root, manifes
 
             out_dir = os.path.join(out_root, name, f"{metal}-{stone}")
             os.makedirs(out_dir, exist_ok=True)
+            # method=4 rather than 6, for the same reason pack-matrix.py gives: on several
+            # hundred frames the extra compression of 6 costs minutes and buys a few
+            # percent, which is the wrong trade for an asset regenerated whenever a piece
+            # changes. At 24 azimuths per configuration this went from not finishing inside
+            # ten minutes to finishing inside one.
             for index, image in enumerate(chosen):
                 # Crop can run off the edge after squaring; a transparent canvas keeps it
                 # honest instead of silently shifting the piece back inside the frame.
                 canvas = Image.new("RGBA", (crop[2] - crop[0], crop[3] - crop[1]), (0, 0, 0, 0))
                 canvas.paste(image.crop(crop), (0, 0))
                 canvas.resize((SIDE, SIDE), Image.LANCZOS).save(
-                    os.path.join(out_dir, f"frame_{index:02d}.webp"), "WEBP", quality=92, method=6
+                    os.path.join(out_dir, f"frame_{index:02d}.webp"), "WEBP", quality=92, method=4
                 )
 
             manifest.setdefault(name, {})[f"{metal}-{stone}"] = {
@@ -181,10 +244,21 @@ def main():
     # a re-encode of every frame of every other piece.
     wanted = set(sys.argv[4].split(",")) if len(sys.argv) > 4 else None
 
+    # `None` keeps every azimuth. The necklace and the earring used to keep only frame 0,
+    # which is why a ring turned on a customer's hand and everything else spun flat in the
+    # picture plane - a piece with one view has nothing to turn TO. The frames were always
+    # baked; they were being thrown away one step later.
     jobs = [
         ("ring", matrix, None, None, 19.0),
-        ("necklace", os.path.join(pieces, "necklace"), pendant_stencil, [0], 24.0),
-        ("earring", os.path.join(pieces, "earring"), left_stud_stencil, [0], 9.0),
+        # No stencil for any of them any more.
+        #
+        # The chain and the second stud used to be cut out of the baked pixels here, and it
+        # never worked across a full turn - see worn_stencil for the three ways it failed.
+        # They are now simply not rendered: `piece=necklace-worn` and `piece=earring-worn`
+        # in turntable.tsx draw the drop without its chain and one stud instead of the pair,
+        # because in the scene they are already separate objects. Nothing to separate.
+        ("necklace", os.path.join(pieces, "necklace"), None, None, 24.0),
+        ("earring", os.path.join(pieces, "earring"), None, None, 9.0),
     ]
 
     manifest = {}

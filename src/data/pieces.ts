@@ -42,6 +42,9 @@ export interface Piece {
 
 const AZIMUTHS = 24;
 
+/** How much wider a generated tile is than the piece in it. See tools/multiview/prep.py. */
+const VIEW_PAD = 1.15;
+
 /**
  * The worn cut-outs, from tools/tryon/build-worn.py.
  *
@@ -100,9 +103,18 @@ function fromGenerated(twin: GeneratedTwin): Piece {
     // One photograph, so one view, and the piece in it already fills the picture - which
     // is why the whole frame is worth the piece's real width here and a baked frame's is
     // not. See tools/tryon/build-worn.py for the other case.
+    // All six views go to the camera, not just the cut-out. A piece with one view can
+    // only be spun in the plane of the picture, and that is what made every piece except
+    // the ring look flat on a customer: the frames existed, they were simply not handed
+    // over.
+    //
+    // `frameMm` is the width of the whole SQUARE, and these squares are not cropped to
+    // the piece - tools/multiview/prep.py pads the subject to `max(size) * 1.15` before
+    // the model ever sees it, so the piece fills 1/1.15 of the tile. That padding factor
+    // is the conversion, and it is a fact about the pipeline rather than an estimate.
     worn: () => ({
-      frames: [cutout],
-      frameMm: twin.widthMm,
+      frames: Array.from({ length: twin.views }, (_, index) => `${dir}/view_${index}.png`),
+      frameMm: twin.widthMm * VIEW_PAD,
       wornOn: twin.wornOn,
       label: `${twin.id} · ${twin.wornOn === "ears" ? "both ears" : twin.wornOn === "neck" ? "at the collarbone" : "ring finger"}`,
     }),

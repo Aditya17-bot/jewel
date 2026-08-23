@@ -98,6 +98,38 @@ and pendant below. Two attempts failed on this before the right answer, which is
 morphological opening: erode and dilate by more than a link is thick and the chain is gone
 while the drop is untouched. Thickness, not position.
 
+**A piece with one view cannot be turned, only spun.** `build-worn.py` kept `frames[0]`
+for the necklace and the earring and threw the other 23 away one step after they were
+baked. On a customer every piece except the ring therefore rotated flat in the picture
+plane while the ring turned properly, which reads as the ring being special rather than as
+the others being broken. The frames existed the whole time. Check `src/data/worn.ts` for a
+`frames: 1` before believing a turning bug is in the renderer.
+
+**A stencil is per frame, and a crop is per configuration.** Telling a pendant from its
+chain, or one stud from the pair, has now failed three ways. A horizontal cut cannot work:
+the chain hangs in an arc whose ends come down BESIDE the drop, level with it. One stencil
+taken from frame 0 cannot work across a turn: a column that isolates the near stud head-on
+cuts through the far one in profile. A morphological opening alone cannot work either: a
+chain seen end-on is foreshortened into something thick enough to survive it. What works is
+opening by thickness and then keeping the largest connected region - the piece is always
+the biggest thing left standing. The CROP stays shared across frames, or the piece
+re-centres every frame and wanders around the finger as it turns.
+
+**WebP `method=6` is the wrong trade above a hundred frames.** It costs minutes and buys a
+few percent. `pack-matrix.py` already said so; `build-worn.py` learnt it again the hard way
+at 432 frames.
+
+**Two unit conventions live in this repo and both are correct.** `RingModel` and
+`PieceModels` are authored at display scale - R-1028 measures 3.67 units across - and
+`turntable.tsx`'s exposure, ContactShadows and shadow camera are all chosen for that.
+Everything in `src/tryon/` and `HeroPiece` is authored in metres at real-world size,
+because it has to sit on a person. Mixing them is silent and looks like anything but a
+scale error: a metres-authored piece dropped into the route baked almost black, because a
+shadow camera framed for 3.67 units resolves nothing across 0.024. The same collision hit
+the gem materials separately - `thickness` and `attenuationDistance` are evaluated in WORLD
+units, so a 150x mount absorbs all the light and the stone goes black. Convert at the
+mounting point and say which scale a number is in.
+
 **MediaPipe requires WebGL2 whatever `delegate` says.** `delegate: 'CPU'` constructs fine and
 then dies inside `detect()`. There is no CPU path. `src/tryon/delegate.ts` probes for it and
 fails fast with a sentence a person can act on, rather than after a 15 MB download.

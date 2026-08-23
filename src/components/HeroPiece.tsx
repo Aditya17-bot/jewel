@@ -97,16 +97,34 @@ function Gem({ stone, geometry }: { stone: StoneId; geometry: THREE.BufferGeomet
            plastic. Coloured stones stay slightly under 1 so the attenuation colour has
            something to tint. */
         transmission={stone === "natural" || stone === "lab" ? 1 : 0.92}
-        thickness={0.006}
+        /* The turntable mounts this metre-authored piece at HERO_TO_ROUTE = 150.
+           MeshPhysicalMaterial evaluates these paths in route/world units, so these
+           values are expressed at that 150x display scale (not in metres). */
+        thickness={0.9}
         ior={palette.ior}
         attenuationColor={palette.attenuation}
-        attenuationDistance={0.018}
+        attenuationDistance={4.5}
         envMapIntensity={1.75}
         clearcoat={0.8}
         clearcoatRoughness={0.025}
       />
     </mesh>
   );
+}
+
+function tube(points: Vec3[], radius: number) {
+  return new THREE.TubeGeometry(
+    new THREE.CatmullRomCurve3(points.map((point) => new THREE.Vector3(...point)), true, "centripetal"),
+    48,
+    radius,
+    8,
+    true,
+  );
+}
+
+/** A 1.25 mm round-brilliant stand-in for the shoulder pavé, never a scaled pear. */
+function createAccentGeometry() {
+  return new THREE.OctahedronGeometry(0.00122, 1);
 }
 
 /**
@@ -116,7 +134,28 @@ function Gem({ stone, geometry }: { stone: StoneId; geometry: THREE.BufferGeomet
  * A real finger size, not an oversized prop. Once a piece sits on a hand a ring secretly
  * ten times too big is much harder to notice than to prevent.
  */
-function SolsticeRing({ metal, stone, gemGeometry, prongGeometry }: Required<Pick<HeroPieceProps, "metal" | "stone">> & { gemGeometry: THREE.BufferGeometry; prongGeometry: THREE.BufferGeometry }) {
+function SolsticeRing({ metal, stone, gemGeometry }: Required<Pick<HeroPieceProps, "metal" | "stone">> & { gemGeometry: THREE.BufferGeometry }) {
+  const stoneScale = 0.58;
+  const gallery = useMemo(() => {
+    const outline: Vec3[] = Array.from({ length: 16 }, (_, index) => {
+      const angle = (index / 16) * Math.PI * 2;
+      const taper = 1 - Math.max(0, Math.sin(angle)) * 0.38;
+      return [Math.cos(angle) * 0.0049 * taper, Math.sin(angle) * 0.0062 + 0.0012, 0] as Vec3;
+    });
+    return tube(outline, 0.00034);
+  }, []);
+  const ribs = useMemo(() => [
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-0.0044, 0.0025, 0), new THREE.Vector3(-0.0035, -0.0002, -0.0022), new THREE.Vector3(0, -0.0009, -0.0034)]), 18, 0.00028, 7, false),
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0.0044, 0.0025, 0), new THREE.Vector3(0.0035, -0.0002, -0.0022), new THREE.Vector3(0, -0.0009, -0.0034)]), 18, 0.00028, 7, false),
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0, -0.005, 0), new THREE.Vector3(0, -0.0034, -0.002), new THREE.Vector3(0, -0.0009, -0.0034)]), 18, 0.00028, 7, false),
+  ], []);
+  const prongs = useMemo(() => [
+    [[-0.0043, 0.0029, -0.0002], [-0.0041, 0.0028, 0.0019], [-0.0035, 0.0021, 0.0026]],
+    [[0.0043, 0.0029, -0.0002], [0.0041, 0.0028, 0.0019], [0.0035, 0.0021, 0.0026]],
+    [[-0.0024, -0.0045, -0.0002], [-0.0022, -0.0044, 0.0018], [-0.0017, -0.0037, 0.0025]],
+    [[0.0024, -0.0045, -0.0002], [0.0022, -0.0044, 0.0018], [0.0017, -0.0037, 0.0025]],
+  ].map((points) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points.map((point) => new THREE.Vector3(...point as Vec3))), 16, 0.00034, 7, false)), []);
+  const accentGeometry = useMemo(createAccentGeometry, []);
   const accents = useMemo(
     () => Array.from({ length: 11 }, (_, index) => {
       const angle = THREE.MathUtils.lerp(-1.12, 1.12, index / 10);
@@ -134,13 +173,14 @@ function SolsticeRing({ metal, stone, gemGeometry, prongGeometry }: Required<Pic
         upright band, then hovers a centimetre above nothing. That one line was most of why
         this did not read as a ring. */}
     <mesh castShadow><torusGeometry args={[0.01015, 0.00105, 14, 80]} /><Metal metal={metal} /></mesh>
-    <mesh position={[0, 0.011, 0.001]}><cylinderGeometry args={[0.007, 0.006, 0.0022, 32]} /><Metal metal={metal} /></mesh>
-    <group position={[0, 0.011, 0.0028]}><Gem stone={stone} geometry={gemGeometry} />
-      {[[-0.0046, 0.002, 0.001] as Vec3, [0.0046, 0.002, 0.001] as Vec3, [-0.0033, -0.0045, 0.001] as Vec3, [0.0033, -0.0045, 0.001] as Vec3].map((position, index) =>
-        <mesh key={index} geometry={prongGeometry} position={position} rotation={[0, index % 2 ? 0.35 : -0.35, index < 2 ? 0.55 : -0.55]}><Metal metal={metal} /></mesh>,
-      )}
+    <group position={[0, 0.011, 0.0028]} scale={stoneScale}>
+      {/* An open pear gallery: girdle rim and tapering ribs leave the pavilion visible. */}
+      <mesh geometry={gallery}><Metal metal={metal} /></mesh>
+      {ribs.map((geometry, index) => <mesh key={index} geometry={geometry}><Metal metal={metal} /></mesh>)}
+      <Gem stone={stone} geometry={gemGeometry} />
+      {prongs.map((geometry, index) => <mesh key={index} geometry={geometry}><Metal metal={metal} /></mesh>)}
     </group>
-    {accents.map((position, index) => <group key={index} position={position} scale={0.19}><Gem stone="natural" geometry={gemGeometry} /></group>)}
+    {accents.map((position, index) => <group key={index} position={position}><Gem stone="natural" geometry={accentGeometry} /></group>)}
   </group>;
 }
 
@@ -166,7 +206,6 @@ function SolsticeNecklace({ metal, stone, gemGeometry }: Required<Pick<HeroPiece
 
 export function HeroPiece({ kind = "ring", metal = "yellow", stone = "emerald" }: HeroPieceProps) {
   const gemGeometry = useMemo(createPearGemGeometry, []);
-  const prongGeometry = useMemo(() => new THREE.CapsuleGeometry(0.00062, 0.0042, 6, 10), []);
   return (
     <>
       {/*
@@ -185,7 +224,7 @@ export function HeroPiece({ kind = "ring", metal = "yellow", stone = "emerald" }
       ) : kind === "necklace" ? (
         <SolsticeNecklace metal={metal} stone={stone} gemGeometry={gemGeometry} />
       ) : (
-        <SolsticeRing metal={metal} stone={stone} gemGeometry={gemGeometry} prongGeometry={prongGeometry} />
+        <SolsticeRing metal={metal} stone={stone} gemGeometry={gemGeometry} />
       )}
     </>
   );

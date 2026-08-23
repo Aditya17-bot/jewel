@@ -91,7 +91,13 @@ const AIR_FRACTION = 0.42;
  * degrees. Measured live it was jumping two hundred degrees between readings while the
  * hand was barely moving.
  */
-const SWEEP_TO_TURN = 3.6;
+const SWEEP_TO_TURN = 5;
+// Measured live at 3.6: the clamp below was being hit on essentially every detection,
+// which means it had stopped being a backstop and become the gain. A hand is about a
+// fifth of the picture wide and a comfortable sweep crosses most of the picture, so five
+// hand-widths is one turn per sweep. The clamp moves with it - a fast hand covers about
+// half its own width in the 42 ms between detections, so 0.25 was clipping real movement
+// and 0.5 only catches the tracker changing its mind about which hand it is looking at.
 /** Below this fraction of the hand's own width, movement is landmark noise, not a sweep. */
 const SWEEP_DEADZONE = 0.02;
 /**
@@ -101,7 +107,7 @@ const SWEEP_DEADZONE = 0.02;
  * anything larger is the tracker changing its mind about which hand it is looking at, not
  * a movement. Without it one swap of the list order spins the piece half a revolution.
  */
-const SWEEP_MAX_STEP = 0.25;
+const SWEEP_MAX_STEP = 0.5;
 /** How much of a new palm position to believe per detection. Low-passes the landmarks. */
 const SWEEP_SMOOTHING = 0.45;
 /** How far the floating piece rises and falls, as a fraction of its own size. */
@@ -484,6 +490,12 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
               if (Math.abs(dx) > SWEEP_DEADZONE) {
                 spinRef.current += (dx / SWEEP_TO_TURN) * 360;
               }
+              // Diagnostic. A gesture cannot be judged from the value it produces - a
+              // number moving too fast and a number moving correctly through a bad gain
+              // look identical on screen. This is the only way to tell them apart.
+              const log = ((globalThis as Record<string, unknown>).__sweep ??= []) as unknown[];
+              log.push({ raw: +raw.toFixed(3), clamped: raw !== dx, span: Math.round(last.span), hands: heldHands.length, side: sweeper.side });
+              if (log.length > 600) log.shift();
             }
             // The stored position trails the real one, which costs a little responsiveness
             // and buys a great deal of steadiness: the palm is derived from two landmarks
