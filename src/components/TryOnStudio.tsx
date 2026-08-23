@@ -542,11 +542,12 @@ export function TryOnStudio() {
           </div>
         </div>
 
-        {/* Was "Drag to turn the head · Scroll to come closer", next to a reset button.
-            Neither is true: this stage is Canvas 2D and has no orbit at all. */}
+        {/* A scale bar and nothing else. It used to carry "Drag to turn the head ·
+            Scroll to come closer" beside a reset-view button, and this stage is Canvas 2D
+            with no orbit at all - and a sentence here runs straight under the lighting
+            switcher, which is centred on the same edge. */}
         <div className="viewer-footnote">
           <span className="scale-mark">10 mm</span>
-          <span>One light falls on the skin and the piece together — that is the comparison</span>
         </div>
       </div>
 

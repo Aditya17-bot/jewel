@@ -16,3 +16,5 @@ qa/audit-2026-08-21/
 
 # tools/multiview/twin.py staging: a spliced kernel with a 180 KB blob in it
 .twin-stage/
+
+codex-report.md

@@ -128,9 +128,12 @@ export function DigitalTwinViewer({ metal, stone, size }: DigitalTwinViewerProps
         </div>
       </div>
 
+      {/* The scale bar alone. This used to carry "Drag to turn · Arrow keys to step",
+          which landed directly on top of the turntable's own "DRAG TO TURN" readout -
+          both are centred on the same edge - and the two rendered as one illegible
+          smear. The readout says it already, and says the current angle as well. */}
       <div className="viewer-footnote">
         <span className="scale-mark">10 mm</span>
-        <span>Drag to turn&nbsp;&nbsp;·&nbsp;&nbsp;Arrow keys to step</span>
       </div>
     </div>
   );
