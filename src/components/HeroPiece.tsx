@@ -120,13 +120,20 @@ function SolsticeRing({ metal, stone, gemGeometry, prongGeometry }: Required<Pic
   const accents = useMemo(
     () => Array.from({ length: 11 }, (_, index) => {
       const angle = THREE.MathUtils.lerp(-1.12, 1.12, index / 10);
-      return [Math.sin(angle) * 0.0108, Math.cos(angle) * 0.0108 + 0.0042, 0.001] as Vec3;
+      // On the shank's own circle. Centred 4.2 mm above it, the accents left the metal
+      // entirely and hung in the air beside the stone.
+      return [Math.sin(angle) * 0.0108, Math.cos(angle) * 0.0108, 0.001] as Vec3;
     }),
     [],
   );
   return <group name="solstice-hand-ring" rotation={[0.2, -0.5, 0]}>
     {/* 18.2 mm inside diameter, 2.1 mm shank: a wearable finger ring, not an oversized prop. */}
-    <mesh rotation={[Math.PI / 2, 0, 0]} castShadow><torusGeometry args={[0.01015, 0.00105, 14, 80]} /><Metal metal={metal} /></mesh>
+    {/* No rotation. TorusGeometry already lies in the XY plane, which is a ring standing
+        up as you would look at it - a finger goes through it along Z. Rotated a quarter
+        turn about X it lies flat like a hoop on a table, and the head, positioned for the
+        upright band, then hovers a centimetre above nothing. That one line was most of why
+        this did not read as a ring. */}
+    <mesh castShadow><torusGeometry args={[0.01015, 0.00105, 14, 80]} /><Metal metal={metal} /></mesh>
     <mesh position={[0, 0.011, 0.001]}><cylinderGeometry args={[0.007, 0.006, 0.0022, 32]} /><Metal metal={metal} /></mesh>
     <group position={[0, 0.011, 0.0028]}><Gem stone={stone} geometry={gemGeometry} />
       {[[-0.0046, 0.002, 0.001] as Vec3, [0.0046, 0.002, 0.001] as Vec3, [-0.0033, -0.0045, 0.001] as Vec3, [0.0033, -0.0045, 0.001] as Vec3].map((position, index) =>
