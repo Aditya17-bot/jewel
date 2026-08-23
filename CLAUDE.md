@@ -22,7 +22,7 @@ src/data/         the catalogue. worn.ts is GENERATED — do not edit by hand.
 src/turntable.tsx an offscreen render route the bake scripts photograph. Not user-facing.
 tools/turntable/  bake the twins (node + browser-automation skill, then a Python packer).
 tools/tryon/      cut the worn assets out of the bake.
-tools/multiview/  the Kaggle Zero123++ harness. One photo -> 6 views.
+tools/multiview/  twin.py: one photo -> 6 views -> a piece in the catalogue.
 public/           every asset the site serves. ~40 MB of baked frames.
 ```
 
@@ -37,6 +37,18 @@ src/turntable.tsx                      the piece, rendered, one pose per URL has
   -> tools/turntable/pack-matrix.py    640px WebP q90  -> public/turntable, public/pieces-3d
   -> tools/tryon/build-worn.py         cut-outs        -> public/worn + src/data/worn.ts
 ```
+
+And for a piece we only have a photograph of, one command:
+
+```bash
+python tools/multiview/twin.py photo.png --slug my-ring --id R-3000     --name "My Ring" --worn finger --width-mm 19
+```
+
+crop and matte -> splice into the kernel -> Kaggle -> `public/twins/<slug>/` ->
+`public/pieces/<slug>.png` -> `public/twins/manifest.json` -> `src/data/twins.ts`, which
+`pieces.ts` reads. **No hand-written file is edited to add a piece.** `--prep-only`,
+`--from <dir>` and `--register-only` split the middle (GPU) stage out for a machine with
+no Kaggle token.
 
 Commands, with the dev server on 5174 serving `/turntable.html`:
 
@@ -93,6 +105,12 @@ fails fast with a sentence a person can act on, rather than after a 15 MB downlo
 **Ask the camera for as little as possible.** The laptop's webcam is 640x480 4:3 and answers
 a 16:9 request with `NotReadableError`. `facingMode` is the only constraint left, and even
 that is dropped on refusal. This bug meant the camera had never worked at all.
+
+**An absolutely positioned bar across a stage eats the drag under it.** `.viewer-footnote`
+stretched `left: 28px; right: 28px` at z-index 4 over the turntable and took the drag out
+of the bottom fifty pixels of the flagship viewer, invisibly. Its centre span also landed
+exactly on the turntable's own readout and the two rendered as one smear. Overlays on a
+stage are content-width and `pointer-events: none` unless something in them is clickable.
 
 **Fingertips are the worst landmarks on the hand.** Thumb-to-index worked as a *pinch*
 detector and was hopeless as a *rotation* signal — forty degrees of travel on two jittery
@@ -151,10 +169,19 @@ per piece. No customer ever waits on it, and no API key ever reaches the browser
 
 ## State of the repo
 
-Working, on `jewel/main` at `8d7d01f`.
+Working, on `jewel/main` at `f1862c2`.
 
-- Four catalogue pieces: R-1028 ring, N-1032 pendant, E-2419 studs, R-2201 vine ring
-  (generated). A fifth appears when a photo is uploaded.
+- Five catalogue pieces: R-1028 ring, N-1032 pendant, E-2419 studs, and two generated from
+  photographs - R-2201 vine ring and E-3310 rose halo stud. A sixth appears when a photo
+  is uploaded. The generated ones come from `src/data/twins.ts`, which is written by
+  `tools/multiview/twin.py`; nothing about them is hand-maintained.
+- The photo section wears rings on a hand as well as pieces on a face. `handphoto.ts` is
+  an IMAGE-mode HandLandmarker and its own Canvas 2D renderer; the hand comes from an
+  upload or from `HandSnap`, which takes one frame from the camera. There is no stock hand
+  photograph and there will not be one.
+- The collections, manufacturer-value and roadmap sections are gone. All three were demo
+  data dressed as product, and the roadmap advertised photo-to-3D and AR try-on as "Future
+  Capability" while the two sections above it did both.
 - Live camera try-on for finger, ears and neck, with pinch-drag to resize and turn, and an
   "in my hand" mode driven by the hand's own axis.
 - Upload a photo in the try-on panel: it is cut out in the browser and becomes a wearable
@@ -162,24 +189,21 @@ Working, on `jewel/main` at `8d7d01f`.
 - `npm run build` clean. `npm run test:sites` 4/4.
 - `npm run typecheck` reports **141 pre-existing errors in `src/tryon/*`** — all implicit
   `any` in files written before the project was typed. Not from recent work, and the build
-  is deliberately not gated on it. Do not "fix" these as a side quest.
+  is deliberately not gated on it. Do not "fix" these as a side quest; there is a briefed
+  job for it at `tools/codex-typecheck.md`.
 
 ### Next, in order
 
-1. **Rings on a hand in the photo section.** `TryOnStudio` only has face photos (Aarav,
-   Mira) and `JEWELS.band` is anchored to the *ear*, which is nonsense. Needs an IMAGE-mode
-   `HandLandmarker` and a hand photo — and there is no stock hand photo that can legitimately
-   be shipped, so it will have to be the user's own photo or a still snapped from the camera.
-2. **Close the multi-view loop.** Uploading gives a flat cut-out today. Wire
-   `tools/multiview/` into one command that takes a PNG, runs the Kaggle kernel, drops six
-   views into `public/twins/<slug>/`, and registers them in a manifest the catalogue reads —
-   so a photographed piece becomes a turnable twin without hand-editing `pieces.ts`.
-   Blocked on a Kaggle API token (`kaggle.json`) for a real end-to-end run.
-3. **Premium visual pass.** Asked for and never delivered — "keep it simple, don't change
-   the design, make it more premium".
-4. **Cloudflare deploy.** `worker/index.js` exists and passes its tests; there is no
+1. **One real end-to-end `twin.py` run.** Every stage is wired and the local halves are
+   verified, but the Kaggle middle has never been exercised by the script - it needs a
+   `kaggle.json`. Until then `--prep-only` / `--from` is the honest path.
+2. **The 141 `src/tryon/*` type errors.** Brief written at `tools/codex-typecheck.md`,
+   runner at `tools/codex-typecheck.sh`. Scoped to `src/tryon/`, no behaviour changes, no
+   `any`. Worth doing because the build is not gated on typecheck, so those 141 are hiding
+   any real error that appears in that directory.
+3. **Cloudflare deploy.** `worker/index.js` exists and passes its tests; there is no
    `wrangler.toml` and no deploy has happened. COOP/COEP are set in `vite.config.mjs` for
-   dev but **not** in the worker.
+   dev but **not** in the worker. Explicitly deferred by the user - do not deploy.
 
 ### Outstanding, not code
 
