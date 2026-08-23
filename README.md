@@ -2,6 +2,10 @@
 
 **A jeweller's catalogue of digital twins you can turn, and a customer trying them on through their own camera.**
 
+### ▶ [Try it live](https://aurelia-antlers.jwelery-ecommerce.workers.dev)
+
+Turn a piece, then open your camera and wear it. Nothing is uploaded.
+
 No server. No API keys. No GPU required. Everything runs in the browser, and the camera never uploads a frame.
 
 <p align="center">

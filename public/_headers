@@ -1,0 +1,33 @@
+# Cross-origin isolation, applied by Cloudflare's static-asset server.
+#
+# This cannot live in worker/index.js alone. When a Worker has an [assets] binding, the
+# asset server answers matching requests DIRECTLY and never invokes the Worker - so headers
+# set there land on 404s and on the SPA fallback, and on nothing a visitor actually loads.
+# Verified against the first deploy: `/` came back with no Cross-Origin-* headers at all
+# while `/nope` came back with all three.
+#
+# Without these, MediaPipe's WASM cannot use SharedArrayBuffer and silently drops to a
+# single-threaded path. Nothing in the console says the fast path was declined.
+#
+# require-corp is free here rather than a trade: there is no CDN anywhere in this project,
+# so every asset is same-origin by construction.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+
+# Content-addressed by Vite, so these can never go stale.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Baked frames change only when a piece is re-rendered, and then their folder changes too.
+/turntable/*
+  Cache-Control: public, max-age=604800
+/pieces-3d/*
+  Cache-Control: public, max-age=604800
+/worn/*
+  Cache-Control: public, max-age=604800
+/hero/*
+  Cache-Control: public, max-age=604800
+/mediapipe/*
+  Cache-Control: public, max-age=2592000

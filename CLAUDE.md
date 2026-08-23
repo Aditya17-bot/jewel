@@ -249,17 +249,15 @@ Working, on `jewel/main` at `85d3890`.
 4. **The 141 `src/tryon/*` type errors.** Brief at `tools/codex-typecheck.md`, runner at
    `tools/codex-typecheck.sh`. Worth doing because the build is not gated on typecheck, so
    those 141 hide any real error that appears in that directory.
-5. **Cloudflare deploy.** `worker/index.js` passes its tests; there is no `wrangler.toml`
-   and no deploy has happened. COOP/COEP are set in `vite.config.mjs` for dev but **not**
-   in the worker. Explicitly deferred by the user — do not deploy.
-
-### A note on the second agent
-
-Codex works in this repo and has been useful. Two briefs are checked in as the pattern to
-copy: `tools/codex-hero-fixes.md` and `tools/codex-typecheck.md`. Both fence off the files
-another agent is editing, both forbid committing, and both end by telling it how to LOOK at
-its own work. The first hero attempt failed almost entirely because it could not — the
-models were structurally right and rendered matte black, and nobody saw it for a day.
+5. ~~Cloudflare deploy.~~ **Done** — https://aurelia-antlers.jwelery-ecommerce.workers.dev
+   `npm run deploy` builds, tests and ships. One thing worth knowing before touching it:
+   **a Worker with an `[assets]` binding is NOT invoked for requests that match an asset.**
+   Cloudflare's asset server answers those directly, so headers set in `worker/index.js`
+   land on 404s and on the SPA fallback and on nothing a visitor actually loads. The first
+   deploy proved it: `/` came back with no `Cross-Origin-*` at all while `/nope` came back
+   with all three. Cross-origin isolation and cache policy therefore live in
+   `public/_headers`, which the asset server applies itself and which costs no Worker
+   invocation. The Worker keeps its copy for the paths it does serve.
 ### Outstanding, not code
 
 A real `TRIPO_API_KEY` sits in plaintext at `C:\adi\_archive\photo-to-3d\server\.env`. It is
