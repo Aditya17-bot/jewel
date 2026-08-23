@@ -201,8 +201,12 @@ per piece. No customer ever waits on it, and no API key ever reaches the browser
 
 ## State of the repo
 
-Working, on `jewel/main` at `f1862c2`.
+Working, on `jewel/main` at `85d3890`.
 
+- **Every piece turns on the customer**, not only the ring. The worn cut-outs are 24
+  azimuths each, and the necklace and earring are photographed as `necklace-worn` /
+  `earring-worn` — the drop without its chain, one stud instead of the pair — rather than
+  stencilled afterwards. `public/worn` is 19 MB and that is the price of it.
 - Five catalogue pieces: R-1028 ring, N-1032 pendant, E-2419 studs, and two generated from
   photographs - R-2201 vine ring and E-3310 rose halo stud. A sixth appears when a photo
   is uploaded. The generated ones come from `src/data/twins.ts`, which is written by
@@ -226,17 +230,36 @@ Working, on `jewel/main` at `f1862c2`.
 
 ### Next, in order
 
-1. **One real end-to-end `twin.py` run.** Every stage is wired and the local halves are
-   verified, but the Kaggle middle has never been exercised by the script - it needs a
+1. **Verify the sweep gesture with a real pair of hands.** `SWEEP_TO_TURN` and
+   `SWEEP_MAX_STEP` in `LiveTryOn` were retuned from one measured session in which the
+   clamp was being hit on essentially every detection — it had stopped being a backstop
+   and become the gain. The new values are reasoned, not confirmed. **There is a
+   diagnostic still in the file** that logs raw per-detection `dx` to `globalThis.__sweep`;
+   it exists because a number moving too fast and a number moving correctly through a bad
+   gain look identical from the output alone. Delete it once the gesture is signed off.
+   `src/tryon/handphoto.ts` has a matching `__lastHandLandmarks` hook, for the same reason
+   and with the same expiry.
+2. **Bake Codex's Solstice hero pieces and decide on them.** `HeroPiece.tsx` is reworked
+   and builds; `hero-ring` / `hero-earring` / `hero-necklace` render on `/turntable.html`.
+   The ring has not been photographed since the rework. The landing page is still R-1028
+   and should stay that way until the new one clearly beats it.
+3. **One real end-to-end `twin.py` run.** Every stage is wired and the local halves are
+   verified, but the Kaggle middle has never been exercised by the script — it needs a
    `kaggle.json`. Until then `--prep-only` / `--from` is the honest path.
-2. **The 141 `src/tryon/*` type errors.** Brief written at `tools/codex-typecheck.md`,
-   runner at `tools/codex-typecheck.sh`. Scoped to `src/tryon/`, no behaviour changes, no
-   `any`. Worth doing because the build is not gated on typecheck, so those 141 are hiding
-   any real error that appears in that directory.
-3. **Cloudflare deploy.** `worker/index.js` exists and passes its tests; there is no
-   `wrangler.toml` and no deploy has happened. COOP/COEP are set in `vite.config.mjs` for
-   dev but **not** in the worker. Explicitly deferred by the user - do not deploy.
+4. **The 141 `src/tryon/*` type errors.** Brief at `tools/codex-typecheck.md`, runner at
+   `tools/codex-typecheck.sh`. Worth doing because the build is not gated on typecheck, so
+   those 141 hide any real error that appears in that directory.
+5. **Cloudflare deploy.** `worker/index.js` passes its tests; there is no `wrangler.toml`
+   and no deploy has happened. COOP/COEP are set in `vite.config.mjs` for dev but **not**
+   in the worker. Explicitly deferred by the user — do not deploy.
 
+### A note on the second agent
+
+Codex works in this repo and has been useful. Two briefs are checked in as the pattern to
+copy: `tools/codex-hero-fixes.md` and `tools/codex-typecheck.md`. Both fence off the files
+another agent is editing, both forbid committing, and both end by telling it how to LOOK at
+its own work. The first hero attempt failed almost entirely because it could not — the
+models were structurally right and rendered matte black, and nobody saw it for a day.
 ### Outstanding, not code
 
 A real `TRIPO_API_KEY` sits in plaintext at `C:\adi\_archive\photo-to-3d\server\.env`. It is
