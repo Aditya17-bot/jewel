@@ -73,8 +73,23 @@ const MAX_SCALE = 2.4;
 const DRAG_TO_DOUBLE = 1.1;
 /** Horizontal pinch-drag, as a multiple of the hand's own width, for a full turn. */
 const DRAG_TO_TURN = 2.2;
-/** In the air, the piece is drawn this many times the width of the hand holding it. */
-const AIR_SIZE = 1.5;
+/**
+ * In the air, the piece floats at this fraction of the frame's short edge.
+ *
+ * Sized off the FRAME, not off the hand. Hanging it on the hand meant it shrank whenever
+ * you moved back from the lens and vanished the moment the hand left the picture, which
+ * is the opposite of what "let me look at this" wants: the piece is the subject here, and
+ * the hands are only the controls.
+ */
+const AIR_FRACTION = 0.42;
+/** Hand-widths of sideways travel for one full turn. */
+const SWEEP_TO_TURN = 1.6;
+/** Below this fraction of the hand's own width, movement is landmark noise, not a sweep. */
+const SWEEP_DEADZONE = 0.012;
+/** How far the floating piece rises and falls, as a fraction of its own size. */
+const FLOAT_RISE = 0.035;
+/** Milliseconds for one rise and fall. Slow: a hover, not a bounce. */
+const FLOAT_PERIOD_MS = 3400;
 
 const MESSAGES: Record<string, string> = {
   "camera-denied": "Camera access was refused. Allow it for this site, then press Start again.",
@@ -207,6 +222,10 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
   const scaleRef = useRef(1);
   const spinRef = useRef(0);
   const gripRef = useRef<{ x: number; y: number; scale: number; spin: number; span: number } | null>(null);
+  /** Last position of the sweeping hand, for the turn gesture in the air. */
+  const sweepRef = useRef<{ x: number; span: number } | null>(null);
+  /** Distance between two pinched hands when the two-handed resize began. */
+  const spreadRef = useRef<{ gap: number; scale: number } | null>(null);
   const modeRef = useRef<Mode>("worn");
   const pieceRef = useRef(piece);
 
@@ -221,8 +240,18 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
     scaleRef.current = 1;
     spinRef.current = 0;
     gripRef.current = null;
+    sweepRef.current = null;
+    spreadRef.current = null;
     setReadout(null);
   }, [piece]);
+
+  // A half-finished gesture must not carry across a mode change: a pinch begun to resize
+  // a worn piece would otherwise be read as the start of a two-handed spread.
+  useEffect(() => {
+    gripRef.current = null;
+    sweepRef.current = null;
+    spreadRef.current = null;
+  }, [mode]);
 
   const stop = useCallback(() => {
     window.cancelAnimationFrame(rafRef.current);
@@ -371,7 +400,7 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
 
       // The readout is the one thing here that does belong in React state, so it is
       // published on a slow clock rather than on every painted frame.
-      if (timestamp - lastPublished > 140) {
+      if (modeRef.current === "worn" && timestamp - lastPublished > 140) {
         lastPublished = timestamp;
         const adjusted = Boolean(grabbing) || scaleRef.current !== 1 || spinRef.current !== 0;
         setReadout(adjusted ? { scale: scaleRef.current, azimuth: Math.round(wrapped) } : null);
@@ -379,39 +408,78 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
 
       // ---- in the air ----------------------------------------------------------------
       //
-      // Held between finger and thumb rather than worn: it follows the pinch, it grows as
-      // the hand comes towards the lens, and turning the wrist turns the twin through its
-      // own views. Nothing is being tracked onto a body, so this is the honest way to look
-      // a piece over - and the one that still works for a piece with no anchor on you.
+      // The piece floats in the middle of the picture and your hands are the controls,
+      // rather than the piece being stuck to a hand. Two separate gestures, and they
+      // cannot both be running:
+      //
+      //   both hands pinched   the gap between the two pinches is the size, exactly the
+      //                        way a photograph is zoomed on a phone
+      //   one hand sweeping    left and right turns the piece through its own views
+      //
+      // Sweeping needs no pinch. A pinch is a good way to say "I am holding this" and a
+      // poor way to say "turn it": it comes apart within about forty degrees of wrist
+      // travel, so the turn kept stopping halfway. An open hand moving across the picture
+      // has as much room as the picture is wide.
       if (modeRef.current === "air") {
-        const holder = grabbing ?? heldHands[0];
-        if (holder) {
-          const size = holder.span * AIR_SIZE * scaleRef.current;
-          // Turn your hand and the piece turns with it - through the twin's own views if it
-          // has them, in the plane of the picture if it has only the one.
-          //
-          // Driven by the hand's long axis, not by the thumb-to-index line. The line
-          // between two fingertips was the first thing tried and it barely moved: it swings
-          // about forty degrees before a pinch comes apart, and fingertips jitter. The
-          // wrist-to-knuckle axis goes right round and sits on two steady landmarks.
-          //
-          // Measured from pointing straight up, because that is how a hand is held out to
-          // be looked at, and it should be the piece's front view when it is.
-          const turned = holder.handAngle + Math.PI / 2;
-          const wrap = ((turned % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-          const turn = count > 1 ? Math.round((wrap / (Math.PI * 2)) * count) % count : 0;
-          const angle = count > 1 ? 0 : wrap;
-          // Held in the palm rather than at the fingertips: the pinch point wanders to the
-          // edge of the hand as the fingers open, which makes the piece look like it is
-          // falling out.
-          const x = (holder.pinch.x + holder.palm.x) / 2;
-          const y = (holder.pinch.y + holder.palm.y) / 2;
-          stamp(context, images[turn] ?? image, x, y, size, angle);
+        const pinched = heldHands.filter((hand) => hand.pinching);
 
-          if (timestamp - lastPublished > 140) {
-            lastPublished = timestamp;
-            setReadout({ scale: scaleRef.current, azimuth: Math.round((wrap * 180) / Math.PI) });
+        if (pinched.length >= 2) {
+          const gap = Math.hypot(
+            pinched[0].pinch.x - pinched[1].pinch.x,
+            pinched[0].pinch.y - pinched[1].pinch.y,
+          );
+          // The gap at the moment the second pinch closed is 100%; everything after is a
+          // ratio against it. Absolute distances would make the size depend on how far
+          // away you happen to be standing.
+          spreadRef.current ??= { gap, scale: scaleRef.current };
+          const start = spreadRef.current;
+          if (start.gap > 1) {
+            scaleRef.current = Math.min(
+              MAX_SCALE,
+              Math.max(MIN_SCALE, start.scale * (gap / start.gap)),
+            );
           }
+          // Both hands are busy sizing. Dropping the sweep reference here rather than
+          // letting it go stale stops the piece lurching a quarter turn when they open.
+          sweepRef.current = null;
+        } else {
+          spreadRef.current = null;
+
+          const sweeper = heldHands[0];
+          if (sweeper) {
+            const last = sweepRef.current;
+            // Measured against the hand's own width, so the same movement turns the piece
+            // the same amount at arm's length and up against the lens. The palm, not a
+            // fingertip: it is the steadiest point on a hand and it is still there when
+            // the fingers are doing something else.
+            if (last && last.span > 1) {
+              const dx = (sweeper.palm.x - last.x) / last.span;
+              if (Math.abs(dx) > SWEEP_DEADZONE) {
+                spinRef.current += (dx / SWEEP_TO_TURN) * 360;
+              }
+            }
+            sweepRef.current = { x: sweeper.palm.x, span: sweeper.span };
+          } else {
+            sweepRef.current = null;
+          }
+        }
+
+        // Recomputed rather than reused: the gestures above have just moved the spin, and
+        // the values from the top of the frame are a gesture out of date.
+        const airWrap = ((spinRef.current % 360) + 360) % 360;
+        const airIndex = count > 1 ? Math.round((airWrap / 360) * count) % count : 0;
+        const airAngle = count > 1 ? 0 : (airWrap * Math.PI) / 180;
+
+        const size = Math.min(width, height) * AIR_FRACTION * scaleRef.current;
+        // A piece pinned to an exact pixel reads as printed on the glass. A slow rise and
+        // fall of three percent is enough to read as suspended, and small enough that
+        // nobody notices it as animation.
+        const rise = Math.sin((timestamp / FLOAT_PERIOD_MS) * Math.PI * 2) * size * FLOAT_RISE;
+        stamp(context, images[airIndex] ?? image, width / 2, height / 2 + rise, size, airAngle);
+
+        if (timestamp - lastPublished > 140) {
+          lastPublished = timestamp;
+          setReadout({ scale: scaleRef.current, azimuth: Math.round(airWrap) });
         }
         return;
       }
@@ -486,16 +554,16 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
         {status === "live" && !tracking && (
           <p className="live-hint">
             {piece.wornOn === "finger"
-              ? "Hold a hand up, palm towards the camera, and pinch to take hold of it."
+              ? "The piece is floating in front of you. Hold a hand up to take the controls."
               : "Looking for you — face the camera and make sure the light is on you."}
           </p>
         )}
         {status === "live" && tracking && (
           <p className="live-hint">
-            {readout
-              ? `${Math.round(readout.scale * 100)}% size · ${String(readout.azimuth).padStart(3, "0")}°`
-              : mode === "air"
-                ? `Hold a hand up — turn it to ${turnable ? "turn" : "rotate"} the piece, move it closer to make it bigger.`
+            {mode === "air"
+              ? `${Math.round((readout?.scale ?? 1) * 100)}% · ${String(readout?.azimuth ?? 0).padStart(3, "0")}°  ·  sweep to ${turnable ? "turn" : "rotate"}, pinch both hands to resize`
+              : readout
+                ? `${Math.round(readout.scale * 100)}% size · ${String(readout.azimuth).padStart(3, "0")}°`
                 : `Pinch thumb and finger, then drag sideways to ${turnable ? "turn" : "rotate"} it and up or down to resize.`}
           </p>
         )}
@@ -526,18 +594,20 @@ export function LiveTryOn({ piece }: LiveTryOnProps) {
               className={mode === "air" ? "is-selected" : undefined}
               onClick={() => setMode("air")}
             >
-              In my hand
+              In the air
             </button>
           </div>
         )}
         <span className="live-piece">
-          {canWear ? piece.label : `${piece.label} · held, not worn`}
+          {canWear ? piece.label : `${piece.label} · in the air, not worn`}
         </span>
         {!canWear && (
           <p className="live-aside">
-            A ring is held in your hand here, not worn on it — a live camera gives no wrist
-            roll and no finger thickness, so a band drawn on a moving finger floats. To see
-            one on a finger, use a photograph in the section below.
+            A ring floats in front of you here rather than sitting on your finger — a live
+            camera gives no wrist roll and no finger thickness, so a band drawn on a moving
+            finger never looks like it is round it. Sweep a hand left or right to turn the
+            piece; pinch with both hands and move them apart to resize. To see one actually
+            on a finger, use a photograph in the section below.
           </p>
         )}
       </div>

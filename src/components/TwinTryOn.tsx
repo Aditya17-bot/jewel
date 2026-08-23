@@ -305,8 +305,10 @@ export function TwinTryOn() {
               : piece.wornOn === "neck"
                 ? "Start the camera and the piece hangs at your collarbone, on a chain drawn to fit you."
                 : "Start the camera and hold a hand up — the piece goes on your ring finger."}
-            {" "}Pinch thumb and finger and drag: up and down resizes it, sideways{" "}
-            {turns ? "turns it through the twin's 24 views" : "rotates it"}.
+            {" "}On you: pinch thumb and finger and drag — up and down resizes, sideways{" "}
+            {turns ? "turns it through the twin's 24 views" : "rotates it"}. In the air: the
+            piece floats in front of you, a hand sweeping left or right turns it, and pinching
+            with both hands and moving them apart resizes it.
             {" "}The camera opens only when you press the button and closes when you press stop.
             Frames go into the models and straight back onto the screen: none is sent anywhere,
             and none is kept.
